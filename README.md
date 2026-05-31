@@ -144,6 +144,7 @@ Edit `config.py`:
 - SPI must be enabled: `sudo raspi-config` → Interface Options → SPI
 - Python runs in a project venv (`.venv/`) to avoid Raspberry Pi OS pip restrictions
 - **Anker collector** requires Python 3.11+ (check with `python3 --version`)
+- **Bluetooth** must be enabled: `sudo raspi-config` → Interface Options → Bluetooth, or run `sudo systemctl start bluetooth && sudo bluetoothctl power on`
 
 ## Roadmap (P0)
 

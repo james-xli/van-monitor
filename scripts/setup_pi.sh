@@ -32,9 +32,26 @@ sudo apt-get install -y \
   python3-gpiozero \
   python3-spidev \
   bluez \
+  bluez-tools \
+  pi-bluetooth \
   libbluetooth-dev \
   libffi-dev \
   libssl-dev
+
+echo "==> Enabling Bluetooth..."
+if grep -q "^dtoverlay=disable-bt" /boot/firmware/config.txt 2>/dev/null \
+   || grep -q "^dtoverlay=disable-bt" /boot/config.txt 2>/dev/null; then
+  echo "Warning: dtoverlay=disable-bt is set — Bluetooth is disabled at boot."
+  echo "Remove that line from config.txt and reboot."
+else
+  sudo systemctl enable hciuart bluetooth
+  sudo systemctl start hciuart
+  sudo systemctl start bluetooth
+  sudo rfkill unblock bluetooth 2>/dev/null || true
+  sleep 2
+  sudo hciconfig hci0 up 2>/dev/null || true
+  sudo bluetoothctl power on || true
+fi
 
 echo "==> Creating Python virtual environment..."
 python3 -m venv --system-site-packages "$VENV_DIR"
