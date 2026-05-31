@@ -11,7 +11,7 @@ from PIL import ImageFont
 import config
 from van_monitor.display import EpaperDisplay
 from van_monitor import layout
-from van_monitor.fonts import load_bold_font
+from van_monitor.fonts import load_bold_font, load_caption_font
 from van_monitor.metrics import (
     VanMetrics,
     fmt,
@@ -29,6 +29,7 @@ class MetricsDashboard(EpaperDisplay):
         self._font_label = load_bold_font(layout.FONT_LABEL)
         self._font_body = load_bold_font(layout.FONT_BODY)
         self._font_hero = load_bold_font(layout.FONT_HERO)
+        self._font_caption = load_caption_font(layout.FONT_LABEL)
 
     def render(self, metrics: VanMetrics) -> None:
         """Redraw the full metrics screen (white background, black text)."""
@@ -87,7 +88,7 @@ class MetricsDashboard(EpaperDisplay):
 
     def _draw_caption_right(self, text: str, zone: layout.Zone, y: int) -> None:
         """Right-aligned caption inside a panel (Figma Medium Italic 12px)."""
-        font = self._font_label
+        font = self._font_caption
         bbox = self._draw.textbbox((0, 0), text, font=font)
         width = bbox[2] - bbox[0]
         x = zone.x1 - width - layout.CAPTION_RIGHT_MARGIN
