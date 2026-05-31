@@ -1,0 +1,7 @@
+# Pip-only dependencies for the Pi virtual environment.
+#
+# Hardware libraries (Pillow, spidev, gpiozero) are installed via apt
+# in scripts/setup_pi.sh and shared into the venv with --system-site-packages.
+#
+# Add Bluetooth and other pip-only packages here, for example:
+# bleak>=0.21.0
