@@ -13,3 +13,29 @@ DISPLAY_REFRESH_INTERVAL_SECONDS = 5
 
 # Shown when a device is disconnected or data is unavailable.
 UNAVAILABLE_LABEL = "NA"
+
+# ---------------------------------------------------------------------------
+# Bluetooth device addresses
+#
+# Run `scripts/ble_scan.py` on the Pi to find names and MAC addresses.
+# Leave an address empty to auto-discover that device type (slower, less
+# predictable — prefer filling in addresses once you know them).
+# ---------------------------------------------------------------------------
+
+# Li-Time 165 Ah house battery (Bluetooth MAC address).
+LITIME_ADDRESS = ""
+
+# Victron SmartSolar MPPT 100/30 with Instant Readout enabled.
+# Get both values from Victron Connect app -> device settings -> Product Info
+# -> Instant Readout via Bluetooth -> Show.
+VICTRON_ADDRESS = ""
+VICTRON_KEY = ""  # 32-character hex advertisement key
+
+# Anker Solix C1000 Gen 2 portable power station.
+ANKER_ADDRESS = ""
+
+# Seconds to wait when scanning / connecting before giving up.
+BLE_TIMEOUT_SECONDS = 15
+
+# Seconds to wait for Anker telemetry after connecting (negotiation can be slow).
+ANKER_TELEMETRY_TIMEOUT_SECONDS = 60
