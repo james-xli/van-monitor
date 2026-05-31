@@ -1,4 +1,4 @@
-"""Load bundled Inter fonts for the dashboard (Figma Main screen v2)."""
+"""Load bundled Inter fonts for the dashboard (Figma Main screen v3)."""
 
 from __future__ import annotations
 

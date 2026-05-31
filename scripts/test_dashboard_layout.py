@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Preview the Figma main-screen layout on the e-paper with sample P0 values.
+Preview the Figma Main screen v3 layout on the e-paper with sample P0 values.
 
 Run on the Raspberry Pi:
     .venv/bin/python3 scripts/test_dashboard_layout.py

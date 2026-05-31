@@ -11,7 +11,7 @@ van-monitor/
 ├── config.py              # Intervals, device addresses, Victron key
 ├── van_monitor/
 │   ├── display.py         # E-paper wrapper
-│   ├── dashboard.py       # Figma Main screen v2 layout (P0, light)
+│   ├── dashboard.py       # Figma Main screen v3 layout (P0, B/W panels)
 │   ├── layout.py          # Zone positions from Figma
 │   ├── metrics.py         # Reading types and terminal output
 │   └── collectors/        # Li-Time, Victron, Anker BLE readers
