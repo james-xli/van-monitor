@@ -14,6 +14,11 @@ DISPLAY_REFRESH_INTERVAL_SECONDS = 5
 # Shown when a device is disconnected or data is unavailable.
 UNAVAILABLE_LABEL = "NA"
 
+# Static captions shown on the dashboard (Main screen v2). Edit to match your gear.
+SOLAR_MAX_W = 220
+HOUSE_BATTERY_CAPACITY_KWH = 2
+ANKER_CAPACITY_KWH = 1
+
 # ---------------------------------------------------------------------------
 # Bluetooth device addresses
 #

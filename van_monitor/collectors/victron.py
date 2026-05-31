@@ -37,11 +37,23 @@ class _VictronReader(BaseScanner):
             device = device_class(self._key)
             parsed = device.parse(raw_data)
             solar_power = parsed.get_solar_power() if hasattr(parsed, "get_solar_power") else None
+            yield_today = (
+                parsed.get_yield_today() if hasattr(parsed, "get_yield_today") else None
+            )
 
-            metrics = VictronMetrics(connected=True, solar_power_w=solar_power)
+            metrics = VictronMetrics(
+                connected=True,
+                solar_power_w=solar_power,
+                yield_today_wh=yield_today,
+            )
             self.result = metrics
             self.done.set()
-            logger.info("Victron: solar output %.0fW (RSSI %s)", solar_power or 0, advertisement.rssi)
+            logger.info(
+                "Victron: %.0fW, %.0f Wh today (RSSI %s)",
+                solar_power or 0,
+                yield_today or 0,
+                advertisement.rssi,
+            )
         except Exception as exc:
             self.result = VictronMetrics(error=str(exc))
             self.done.set()

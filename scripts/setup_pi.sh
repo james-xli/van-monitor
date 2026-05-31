@@ -31,6 +31,7 @@ sudo apt-get install -y \
   python3-numpy \
   python3-gpiozero \
   python3-spidev \
+  fonts-dejavu-core \
   bluez \
   bluez-tools \
   pi-bluetooth \

@@ -11,7 +11,8 @@ van-monitor/
 ├── config.py              # Intervals, device addresses, Victron key
 ├── van_monitor/
 │   ├── display.py         # E-paper wrapper
-│   ├── dashboard.py       # Simple metrics layout for the display
+│   ├── dashboard.py       # Figma Main screen v2 layout (P0, light)
+│   ├── layout.py          # Zone positions from Figma
 │   ├── metrics.py         # Reading types and terminal output
 │   └── collectors/        # Li-Time, Victron, Anker BLE readers
 ├── scripts/
@@ -22,6 +23,7 @@ van-monitor/
 │   ├── run_monitor.py     # Poll all devices + show on display
 │   ├── hello_display.py   # Display smoke test
 │   ├── test_partial_refresh.py
+│   ├── test_dashboard_layout.py  # Sample P0 layout on e-paper
 │   ├── setup_pi.sh        # One-time Pi setup
 │   └── deploy.sh          # Sync code from Mac to Pi
 ├── vendor/waveshare_epd/  # Waveshare SPI driver (vendored)
@@ -130,6 +132,9 @@ Edit `config.py`:
 | `POLL_INTERVAL_SECONDS` | Time between full poll cycles |
 | `DISPLAY_REFRESH_INTERVAL_SECONDS` | Display update interval (used by partial refresh demo) |
 | `UNAVAILABLE_LABEL` | Shown when a device is disconnected (default: `NA`) |
+| `SOLAR_MAX_W` | Solar panel caption, e.g. `220 W max` |
+| `HOUSE_BATTERY_CAPACITY_KWH` | House battery caption, e.g. `2 kWh capacity` |
+| `ANKER_CAPACITY_KWH` | Anker caption, e.g. `1 kWh capacity` |
 | `LITIME_ADDRESS` | Li-Time battery MAC (empty = auto-discover) |
 | `VICTRON_ADDRESS` | Victron MPPT MAC |
 | `VICTRON_KEY` | Victron Instant Readout advertisement key |
@@ -151,7 +156,7 @@ Edit `config.py`:
 | Device              | Metrics                          |
 | ------------------- | -------------------------------- |
 | Li Time house battery | SOC %, net power W, voltage V  |
-| Victron MPPT 100/30 | Solar output W                   |
+| Victron MPPT 100/30 | Solar output W, daily yield Wh   |
 | Anker Solix C1000   | SOC %, power in W, power out W   |
 
 ## References
