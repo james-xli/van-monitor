@@ -14,6 +14,7 @@ van-monitor/
 │   └── collectors/        # (future) Bluetooth device readers
 ├── scripts/
 │   ├── hello_display.py   # Display smoke test
+│   ├── test_partial_refresh.py  # Partial refresh demo (clock)
 │   ├── setup_pi.sh        # One-time Pi setup
 │   └── deploy.sh          # Sync code from Mac to Pi
 ├── vendor/waveshare_epd/  # Waveshare SPI driver (vendored)

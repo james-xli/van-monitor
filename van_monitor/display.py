@@ -47,6 +47,37 @@ class EpaperDisplay:
         """Full white refresh."""
         self._epd.Clear()
 
+    def reset_canvas(self) -> None:
+        """Clear the in-memory canvas to white."""
+        self._canvas = Image.new("1", (self.width, self.height), 255)
+        self._draw = ImageDraw.Draw(self._canvas)
+
+    def fill_rect(self, x0: int, y0: int, x1: int, y1: int, *, fill: int = 255) -> None:
+        """Fill a rectangle on the canvas (255=white erases, 0=black)."""
+        self._draw.rectangle((x0, y0, x1, y1), fill=fill)
+
+    def draw_text(self, text: str, *, x: int = 10, y: int = 10, fill: int = 0) -> None:
+        """Draw text onto the canvas without refreshing the panel."""
+        self._draw.text((x, y), text, font=self._font, fill=fill)
+
+    def refresh(self, *, partial: bool = False, region: tuple[int, int, int, int] | None = None) -> None:
+        """
+        Push the canvas to the panel.
+
+        partial=False: full refresh (slower, no ghosting).
+        partial=True:  partial refresh mode (faster). The Waveshare driver always
+                       reads from the start of the full canvas buffer, so partial
+                       updates still pass the full screen size — only draw the
+                       changed areas on the canvas before calling this.
+        """
+        buffer = self._epd.getbuffer(self._canvas)
+        if partial:
+            # Waveshare demo uses full-screen coords; sub-regions need buffer cropping.
+            x0, y0, x1, y1 = region or (0, 0, self.width, self.height)
+            self._epd.display_Partial(buffer, x0, y0, x1, y1)
+        else:
+            self._epd.display(buffer)
+
     def show_text(
         self,
         text: str,
@@ -55,26 +86,10 @@ class EpaperDisplay:
         y: int = 10,
         partial: bool = False,
     ) -> None:
-        """
-        Draw text on a blank canvas and push it to the display.
-
-        partial=False: full refresh (slower, no ghosting).
-        partial=True:  partial refresh (faster, for frequent updates).
-        """
-        self._canvas = Image.new("1", (self.width, self.height), 255)
-        self._draw = ImageDraw.Draw(self._canvas)
-        self._draw.text((x, y), text, font=self._font, fill=0)
-
-        if partial:
-            self._epd.display_Partial(
-                self._epd.getbuffer(self._canvas),
-                0,
-                0,
-                self.width,
-                self.height,
-            )
-        else:
-            self._epd.display(self._epd.getbuffer(self._canvas))
+        """Draw text on a blank canvas and push it to the display."""
+        self.reset_canvas()
+        self.draw_text(text, x=x, y=y)
+        self.refresh(partial=partial)
 
     def sleep(self) -> None:
         """Put the panel into low-power mode."""
