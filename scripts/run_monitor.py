@@ -29,6 +29,41 @@ from van_monitor.util import setup_logging
 logger = logging.getLogger(__name__)
 
 
+def _should_full_refresh(last_full_refresh: float) -> bool:
+    interval = config.FULL_REFRESH_INTERVAL_SECONDS
+    if interval <= 0:
+        return False
+    return (time.monotonic() - last_full_refresh) >= interval
+
+
+def _update_dashboard(
+    dashboard: MetricsDashboard,
+    metrics,
+    *,
+    partial_mode: bool,
+    force_full: bool,
+    last_full_refresh: float,
+) -> tuple[bool, float]:
+    """
+    Push metrics to the display.
+
+    Returns (partial_mode, last_full_refresh monotonic time).
+    """
+    if force_full or not partial_mode:
+        if force_full:
+            logger.info(
+                "Full display refresh (every %ss)",
+                config.FULL_REFRESH_INTERVAL_SECONDS,
+            )
+        dashboard.init(partial=False)
+        dashboard.show_metrics(metrics, partial=False)
+        dashboard.init(partial=True)
+        return True, time.monotonic()
+
+    dashboard.show_metrics(metrics, partial=True)
+    return partial_mode, last_full_refresh
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the van-monitor BLE dashboard")
     parser.add_argument(
@@ -48,6 +83,7 @@ def main() -> int:
 
     dashboard = None
     partial_mode = False
+    last_full_refresh = time.monotonic()
 
     if not args.no_display:
         dashboard = MetricsDashboard()
@@ -60,13 +96,14 @@ def main() -> int:
         print_metrics(metrics)
 
         if dashboard:
-            if not partial_mode:
-                dashboard.init(partial=False)
-                dashboard.show_metrics(metrics, partial=False)
-                dashboard.init(partial=True)
-                partial_mode = True
-            else:
-                dashboard.show_metrics(metrics, partial=True)
+            force_full = _should_full_refresh(last_full_refresh)
+            partial_mode, last_full_refresh = _update_dashboard(
+                dashboard,
+                metrics,
+                partial_mode=partial_mode,
+                force_full=force_full,
+                last_full_refresh=last_full_refresh,
+            )
 
         if args.once:
             break

@@ -131,6 +131,7 @@ Edit `config.py`:
 | --- | --- |
 | `POLL_INTERVAL_SECONDS` | Time between full poll cycles |
 | `DISPLAY_REFRESH_INTERVAL_SECONDS` | Display update interval (used by partial refresh demo) |
+| `FULL_REFRESH_INTERVAL_SECONDS` | Full e-paper refresh while in partial mode (default 3600; `0` = off) |
 | `UNAVAILABLE_LABEL` | Shown when a device is disconnected (default: `NA`) |
 | `SOLAR_MAX_W` | Solar panel caption, e.g. `220 W max` |
 | `HOUSE_BATTERY_CAPACITY_KWH` | House battery caption, e.g. `2 kWh capacity` |

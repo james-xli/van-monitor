@@ -8,8 +8,13 @@ Edit these values in the field as needed. Keep settings simple and obvious.
 POLL_INTERVAL_SECONDS = 5
 
 # How often to refresh the e-paper display (seconds).
-# Can differ from polling if you want to batch updates.
+# Used by scripts/test_partial_refresh.py; run_monitor updates each poll cycle.
 DISPLAY_REFRESH_INTERVAL_SECONDS = 5
+
+# Full e-paper refresh interval when using partial updates (seconds).
+# Partial refresh is fast but ghosts over time; a full refresh clears it.
+# Set to 0 to disable periodic full refresh (initial full refresh still runs).
+FULL_REFRESH_INTERVAL_SECONDS = 3600
 
 # Shown when a device is disconnected or data is unavailable.
 UNAVAILABLE_LABEL = "NA"
