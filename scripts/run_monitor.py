@@ -77,9 +77,14 @@ def main() -> int:
         help="Print to terminal only (skip e-paper)",
     )
     parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument(
+        "--debug-ble",
+        action="store_true",
+        help="Show bleak/SolixBLE debug (very noisy; use with -v)",
+    )
     args = parser.parse_args()
 
-    setup_logging(args.verbose)
+    setup_logging(args.verbose, debug_ble=args.debug_ble)
 
     dashboard = None
     partial_mode = False

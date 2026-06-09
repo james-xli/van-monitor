@@ -33,19 +33,25 @@ ANKER_CAPACITY_KWH = 1
 # ---------------------------------------------------------------------------
 
 # Li-Time 165 Ah house battery (Bluetooth MAC address).
-LITIME_ADDRESS = ""
+LITIME_ADDRESS = "C8:47:80:3F:8B:64"
 
 # Victron SmartSolar MPPT 100/30 with Instant Readout enabled.
 # Get both values from Victron Connect app -> device settings -> Product Info
 # -> Instant Readout via Bluetooth -> Show.
-VICTRON_ADDRESS = ""
-VICTRON_KEY = ""  # 32-character hex advertisement key
+VICTRON_ADDRESS = "F6:76:F4:A0:59:A7"
+VICTRON_KEY = "5396e672b53fa0194d9b5730508bb1aa"  # 32-character hex advertisement key
 
 # Anker Solix C1000 Gen 2 portable power station.
-ANKER_ADDRESS = ""
+ANKER_ADDRESS = "7C:E9:13:31:84:52"
 
-# Seconds to wait when scanning / connecting before giving up.
-BLE_TIMEOUT_SECONDS = 15
+# Seconds to wait when scanning before connect (Pi Zero W: allow 20–30).
+BLE_TIMEOUT_SECONDS = 25
 
-# Seconds to wait for Anker telemetry after connecting (negotiation can be slow).
-ANKER_TELEMETRY_TIMEOUT_SECONDS = 60
+# Extra Anker discovery attempts when the unit advertises intermittently.
+ANKER_SCAN_RETRIES = 2
+
+# Pause between BLE connect cycles so the radio can settle.
+BLE_COOLDOWN_SECONDS = 2
+
+# Seconds to wait for Anker telemetry after negotiation (first packet can be slow).
+ANKER_TELEMETRY_TIMEOUT_SECONDS = 120

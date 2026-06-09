@@ -95,7 +95,8 @@ with advertisements.
 
 ### 4. Anker Solix C1000 Gen 2
 
-First connection can take up to 60 seconds (BLE negotiation).
+First connection can take up to ~2 minutes (negotiation + first telemetry).
+Wake the unit and ensure the IoT/BT indicator is blinking; close the Anker app.
 
 ```bash
 # Find Anker devices:
@@ -140,8 +141,9 @@ Edit `config.py`:
 | `VICTRON_ADDRESS` | Victron MPPT MAC |
 | `VICTRON_KEY` | Victron Instant Readout advertisement key |
 | `ANKER_ADDRESS` | Anker MAC (empty = auto-discover) |
-| `BLE_TIMEOUT_SECONDS` | Scan / advertisement wait time |
-| `ANKER_TELEMETRY_TIMEOUT_SECONDS` | Wait for Anker data after connecting |
+| `BLE_TIMEOUT_SECONDS` | Active scan time before connect (default 25s) |
+| `BLE_COOLDOWN_SECONDS` | Pause between BLE devices (default 2s) |
+| `ANKER_TELEMETRY_TIMEOUT_SECONDS` | Wait for first Anker packet after negotiation (default 120s) |
 
 ## Hardware notes
 
@@ -152,7 +154,40 @@ Edit `config.py`:
 - **Anker collector** requires Python 3.11+ (check with `python3 --version`)
 - **Bluetooth** must be enabled: `sudo raspi-config` → Interface Options → Bluetooth, or run `sudo systemctl start bluetooth && sudo bluetoothctl power on`
 
-## Roadmap (P0)
+## USB SSH (Pi Zero W ↔ Mac)
+
+Use when Wi‑Fi is unavailable. SD card boot settings:
+
+**`config.txt`** under `[all]`:
+
+```
+dtoverlay=dwc2,dr_mode=peripheral
+enable_uart=1
+```
+
+**`cmdline.txt`** — include `modules-load=dwc2,g_ether` after `rootwait`.
+
+Do **not** add `ip=...::usb0:off` to cmdline — it runs before `usb0` exists and can
+break USB enumeration.
+
+After the gadget shows up on the Mac once, assign the Pi USB IP (one-time, any SSH):
+
+```bash
+ssh jamesli@van-monitor.local   # use Wi‑Fi for this one step if needed
+cd ~/van-monitor
+bash scripts/setup_usb_gadget_network.sh
+sudo reboot
+```
+
+Mac: System Settings → RNDIS/Ethernet Gadget → manual **192.168.7.1**, mask **255.255.255.0**.
+
+```bash
+ssh jamesli@192.168.7.2
+PI_HOST=jamesli@192.168.7.2 ./scripts/deploy.sh
+```
+
+`van-monitor.local` over mDNS uses Wi‑Fi, not USB — use **192.168.7.2** for USB SSH.
+
 
 | Device              | Metrics                          |
 | ------------------- | -------------------------------- |
