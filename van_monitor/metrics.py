@@ -43,7 +43,7 @@ class VanMetrics:
 
 
 def fmt_yield_today(wh: float | None) -> str:
-    """Format daily solar yield like Figma: '645 Wh today'."""
+    """Format daily solar yield like Figma: '1000 Wh today'."""
     if wh is None:
         return f"{config.UNAVAILABLE_LABEL} Wh today"
     return f"{int(round(wh))} Wh today"
@@ -61,7 +61,7 @@ def fmt(value: float | int | None, *, decimals: int = 0, suffix: str = "") -> st
 
 
 def fmt_signed_watts(power_w: float | None) -> str:
-    """Format signed watts like Figma v2: '+40 W' or '-718 W'."""
+    """Format signed watts like Figma: '+40 W' or '-718 W'."""
     if power_w is None:
         return config.UNAVAILABLE_LABEL
     watts = int(round(power_w))
@@ -75,6 +75,13 @@ def fmt_anker_net(power_in_w: float | None, power_out_w: float | None) -> str:
     if power_in_w is None or power_out_w is None:
         return config.UNAVAILABLE_LABEL
     return fmt_signed_watts(power_in_w - power_out_w)
+
+
+def fmt_updated_at(when: datetime | None) -> str:
+    """Format timestamp like Figma node 25:32: '6/10 16:30'."""
+    if when is None:
+        return ""
+    return f"{when.month}/{when.day} {when:%H:%M}"
 
 
 def print_metrics(metrics: VanMetrics) -> None:
@@ -102,5 +109,8 @@ def print_metrics(metrics: VanMetrics) -> None:
         print(f"  error: {metrics.anker.error}")
     print(f"  SOC:     {fmt(metrics.anker.soc_percent, suffix='%')}")
     print(f"  Net:     {fmt_anker_net(metrics.anker.power_in_w, metrics.anker.power_out_w)}")
-    print(f"    (in {fmt(metrics.anker.power_in_w, suffix=' W')}, out {fmt(metrics.anker.power_out_w, suffix=' W')})")
+    print(
+        f"    (in {fmt(metrics.anker.power_in_w, suffix=' W')}, "
+        f"out {fmt(metrics.anker.power_out_w, suffix=' W')})"
+    )
     print()

@@ -1,10 +1,10 @@
 """
 Figma layout constants for the main screen (800×480).
 
-Source: Van Systems Monitor — frame "Main screen v3" (node 10:55).
+Source: Van Systems Monitor — frame "Main screen v4 w/o Anker" (node 21:30).
 Coordinates are absolute screen positions (panel origin + inner offset).
 
-P1 chart fills are omitted; gray areas in Figma are placeholders for time series.
+P1 chart fills are omitted; gray/black chart areas in Figma are placeholders.
 """
 
 from __future__ import annotations
@@ -14,13 +14,14 @@ from dataclasses import dataclass
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 480
 
-# Inter from Figma v3
+# Inter from Figma v4 (Bold 14/24/54, Medium Italic 14 captions)
 FONT_LABEL = 14
 FONT_BODY = 24
 FONT_HERO = 54
-FONT_CAPTION = 13
+FONT_CAPTION = 14
+FONT_TIMESTAMP = 14
 
-CAPTION_RIGHT_MARGIN = 13
+CAPTION_RIGHT_MARGIN = 14
 
 # 1-bit canvas: 255=white, 0=black
 WHITE = 255
@@ -28,7 +29,6 @@ BLACK = 0
 
 LABEL_SOLAR = "SOLAR"
 LABEL_HOUSE = "HOUSE  BATTERY"
-LABEL_ANKER = "ANKER SOLIX"
 
 
 @dataclass(frozen=True)
@@ -57,26 +57,28 @@ class PanelStyle:
     border: int
     text_fill: int
     text_stroke: int
+    border_width: int = 2
 
 
-# v3: solar = white panel / black type / white glyph outline
+# Solar panel (21:31): white fill, 2px black border
 STYLE_SOLAR = PanelStyle(
     fill=WHITE,
     border=BLACK,
     text_fill=BLACK,
     text_stroke=WHITE,
+    border_width=2,
 )
 
-# v3: battery panels = black fill / white type / black glyph outline
+# House battery panel (21:47): black fill, no border
 STYLE_BATTERY = PanelStyle(
-    fill=WHITE,
+    fill=BLACK,
     border=BLACK,
-    text_fill=BLACK,
-    text_stroke=WHITE,
+    text_fill=WHITE,
+    text_stroke=BLACK,
+    border_width=0,
 )
 
 TEXT_STROKE_WIDTH = 1
-PANEL_BORDER_WIDTH = 2
 
 
 def _abs(frame: Zone, left: int, top: int) -> tuple[int, int]:
@@ -84,31 +86,26 @@ def _abs(frame: Zone, left: int, top: int) -> tuple[int, int]:
     return (frame.x + left, frame.y + top)
 
 
-# Panels (Figma v3)
-SOLAR = Zone(x=15, y=80, width=300, height=140)
-HOUSE_BATTERY = Zone(x=350, y=10, width=440, height=280)
-ANKER = Zone(x=350, y=330, width=440, height=140)
+# Panels — node 21:31 Solar, node 21:47 House Battery
+SOLAR = Zone(x=16, y=170, width=300, height=140)
+HOUSE_BATTERY = Zone(x=344, y=69, width=440, height=341)
 
-# Solar — Group offsets collapsed to inner text positions
+# Solar text (nodes 21:36–21:38, caption 21:33)
 SOLAR_LABEL = _abs(SOLAR, 16, 15)
 SOLAR_VALUE = _abs(SOLAR, 15, 32)
 SOLAR_YIELD_TODAY = _abs(SOLAR, 16, 97)
-SOLAR_MAX_CAPTION_Y = _abs(SOLAR, 0, 111)[1]
+SOLAR_MAX_CAPTION_Y = _abs(SOLAR, 0, 109)[1]
 
-# House battery — two body lines (+40 W, then 12.4 V)
-HOUSE_LABEL = _abs(HOUSE_BATTERY, 16, 125)
-HOUSE_SOC = _abs(HOUSE_BATTERY, 15, 142)
-HOUSE_POWER = _abs(HOUSE_BATTERY, 16, 207)
-HOUSE_VOLTAGE = _abs(HOUSE_BATTERY, 16, 231)
-HOUSE_CAPACITY_CAPTION_Y = _abs(HOUSE_BATTERY, 0, 251)[1]
+# House battery text (nodes 21:51–21:53, caption 21:49)
+HOUSE_LABEL = _abs(HOUSE_BATTERY, 16, 186)
+HOUSE_SOC = _abs(HOUSE_BATTERY, 15, 203)
+HOUSE_POWER = _abs(HOUSE_BATTERY, 16, 268)
+HOUSE_VOLTAGE = _abs(HOUSE_BATTERY, 16, 292)
+HOUSE_CAPACITY_CAPTION_Y = _abs(HOUSE_BATTERY, 0, 310)[1]
 
-# Anker
-ANKER_LABEL = _abs(ANKER, 16, 15)
-ANKER_SOC = _abs(ANKER, 15, 32)
-ANKER_NET_POWER = _abs(ANKER, 16, 97)
-ANKER_CAPACITY_CAPTION_Y = _abs(ANKER, 0, 111)[1]
+# Last-updated stamp (node 25:32)
+UPDATED_AT = (14, 451)
 
-# Flow arrows
-ARROW_SOLAR_TO_HOUSE = ((320, 150), (343, 150))
-ARROW_HOUSE_TO_ANKER = ((570, 297), (570, 325))
+# Flow arrow solar → house (node 21:55)
+ARROW_SOLAR_TO_HOUSE = ((321, 240), (339, 240))
 ARROW_HEAD_SIZE = 10

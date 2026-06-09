@@ -11,20 +11,21 @@ van-monitor/
 ├── config.py              # Intervals, device addresses, Victron key
 ├── van_monitor/
 │   ├── display.py         # E-paper wrapper
-│   ├── dashboard.py       # Figma Main screen v3 layout (P0, B/W panels)
+│   ├── dashboard.py       # Figma Main screen v4 layout (P0, B/W panels)
 │   ├── layout.py          # Zone positions from Figma
 │   ├── metrics.py         # Reading types and terminal output
-│   └── collectors/        # Li-Time, Victron, Anker BLE readers
+│   └── collectors/        # Li-Time, Victron, and Anker BLE readers
 ├── scripts/
 │   ├── ble_scan.py        # Find nearby Bluetooth devices
 │   ├── test_litime.py     # Test one device at a time
 │   ├── test_victron.py
-│   ├── test_anker.py
+│   ├── test_anker.py      # Anker only (not used by run_monitor)
 │   ├── run_monitor.py     # Poll all devices + show on display
 │   ├── hello_display.py   # Display smoke test
 │   ├── test_partial_refresh.py
 │   ├── test_dashboard_layout.py  # Sample P0 layout on e-paper
 │   ├── setup_pi.sh        # One-time Pi setup
+│   ├── install_service.sh # Run monitor on boot (systemd)
 │   └── deploy.sh          # Sync code from Mac to Pi
 ├── vendor/waveshare_epd/  # Waveshare SPI driver (vendored)
 └── requirements-pi.txt    # Python deps for the Pi
@@ -41,8 +42,13 @@ Develop on your Mac. Run hardware code on the Pi.
 # 2. SSH in
 ssh jamesli@van-monitor.local
 cd ~/van-monitor
-bash scripts/setup_pi.sh          # first time only (slow on Pi Zero)
+bash scripts/setup_pi.sh          # first time only
 ```
+
+**Pi Zero pip note:** `bleak` needs `dbus-fast`. piwheels has wheels but pip on
+armv6l (Pi Zero) cannot use their armv7/manylinux tags, so pip would compile the
+Cython extension for 1–2 hours. `setup_pi.sh` sets `SKIP_CYTHON=1` for a fast
+pure-Python install instead.
 
 Override deploy target if needed:
 
@@ -93,20 +99,25 @@ Set `VICTRON_ADDRESS` and `VICTRON_KEY` in `config.py`.
 **Tip:** Close Victron Connect on your phone while testing — it can interfere
 with advertisements.
 
-### 4. Anker Solix C1000 Gen 2
+### 4. Anker Solix C1000 Gen 2 (optional, not in main loop)
 
-First connection can take up to ~2 minutes (negotiation + first telemetry).
-Wake the unit and ensure the IoT/BT indicator is blinking; close the Anker app.
+The Anker collector and `scripts/test_anker.py` are kept for future use, but
+**`run_monitor.py` does not poll Anker**. [SolixBLE](https://github.com/flip-dots/SolixBLE)
+connects and negotiates with the C1000 Gen 2, yet telemetry stays unavailable
+(`AVAILABLE: False`) — see [SolixBLE #22](https://github.com/flip-dots/SolixBLE/issues/22).
+Skipping Anker in the main loop avoids a ~2 minute timeout on every poll cycle.
+
+To experiment with the collector in isolation:
 
 ```bash
 # Find Anker devices:
 .venv/bin/python3 scripts/test_anker.py --discover -v
 
-# Read telemetry:
+# Attempt telemetry (terminal output only for now):
 .venv/bin/python3 scripts/test_anker.py -v
 ```
 
-Set `ANKER_ADDRESS` in `config.py`.
+Set `ANKER_ADDRESS` in `config.py`. Requires Python 3.11+ for SolixBLE.
 
 ### 5. Run everything
 
@@ -116,6 +127,36 @@ Set `ANKER_ADDRESS` in `config.py`.
 
 # Continuous monitoring:
 .venv/bin/python3 scripts/run_monitor.py -v
+```
+
+### 6. Start on boot
+
+After `run_monitor.py` works manually, install a systemd service **on the Pi**
+(not on your Mac — the sudo prompt is for the Pi user password):
+
+```bash
+ssh jamesli@van-monitor.local
+cd ~/van-monitor
+bash scripts/install_service.sh
+```
+
+This enables `van-monitor.service` on boot and starts it immediately. Logs:
+
+```bash
+journalctl -u van-monitor -f
+```
+
+To stop or uninstall:
+
+```bash
+sudo systemctl stop van-monitor
+bash scripts/install_service.sh --remove
+```
+
+After deploying code updates, restart the service:
+
+```bash
+sudo systemctl restart van-monitor
 ```
 
 Terminal-only mode (no e-paper):
@@ -136,11 +177,10 @@ Edit `config.py`:
 | `UNAVAILABLE_LABEL` | Shown when a device is disconnected (default: `NA`) |
 | `SOLAR_MAX_W` | Solar panel caption, e.g. `220 W max` |
 | `HOUSE_BATTERY_CAPACITY_KWH` | House battery caption, e.g. `2 kWh capacity` |
-| `ANKER_CAPACITY_KWH` | Anker caption, e.g. `1 kWh capacity` |
 | `LITIME_ADDRESS` | Li-Time battery MAC (empty = auto-discover) |
 | `VICTRON_ADDRESS` | Victron MPPT MAC |
 | `VICTRON_KEY` | Victron Instant Readout advertisement key |
-| `ANKER_ADDRESS` | Anker MAC (empty = auto-discover) |
+| `ANKER_ADDRESS` | Anker MAC (for `test_anker.py` only) |
 | `BLE_TIMEOUT_SECONDS` | Active scan time before connect (default 25s) |
 | `BLE_COOLDOWN_SECONDS` | Pause between BLE devices (default 2s) |
 | `ANKER_TELEMETRY_TIMEOUT_SECONDS` | Wait for first Anker packet after negotiation (default 120s) |
@@ -151,7 +191,7 @@ Edit `config.py`:
 - **Display:** Waveshare 7.5" black/white V2 e-paper HAT over SPI
 - SPI must be enabled: `sudo raspi-config` → Interface Options → SPI
 - Python runs in a project venv (`.venv/`) to avoid Raspberry Pi OS pip restrictions
-- **Anker collector** requires Python 3.11+ (check with `python3 --version`)
+- **Anker test script** (`test_anker.py`) requires Python 3.11+ for SolixBLE
 - **Bluetooth** must be enabled: `sudo raspi-config` → Interface Options → Bluetooth, or run `sudo systemctl start bluetooth && sudo bluetoothctl power on`
 
 ## USB SSH (Pi Zero W ↔ Mac)
@@ -193,7 +233,7 @@ PI_HOST=jamesli@192.168.7.2 ./scripts/deploy.sh
 | ------------------- | -------------------------------- |
 | Li Time house battery | SOC %, net power W, voltage V  |
 | Victron MPPT 100/30 | Solar output W, daily yield Wh   |
-| Anker Solix C1000   | SOC %, power in W, power out W   |
+| Anker Solix C1000 Gen 2 | Collector present; not polled (SolixBLE telemetry gap) |
 
 ## References
 

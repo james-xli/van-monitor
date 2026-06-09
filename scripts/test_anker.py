@@ -52,7 +52,7 @@ def main() -> int:
     parser.add_argument(
         "--display",
         action="store_true",
-        help="Show this device's values on the e-paper display",
+        help="Show the v4 dashboard on e-paper (Anker panel omitted from layout)",
     )
     parser.add_argument("-v", "--verbose", action="store_true")
     parser.add_argument(

@@ -1,7 +1,7 @@
 """
 Render P0 van metrics on the e-paper display.
 
-Layout matches Figma "Main screen v3" (node 10:55), strict B/W, no chart fills.
+Layout matches Figma "Main screen v4 w/o Anker" (node 21:30), strict B/W, no chart fills.
 """
 
 from __future__ import annotations
@@ -15,14 +15,14 @@ from van_monitor.fonts import load_bold_font, load_caption_font
 from van_monitor.metrics import (
     VanMetrics,
     fmt,
-    fmt_anker_net,
     fmt_signed_watts,
+    fmt_updated_at,
     fmt_yield_today,
 )
 
 
 class MetricsDashboard(EpaperDisplay):
-    """Draw P0 metrics in fixed zones (Figma Main screen v3)."""
+    """Draw P0 metrics in fixed zones (Figma Main screen v4 w/o Anker)."""
 
     def __init__(self):
         super().__init__()
@@ -36,23 +36,21 @@ class MetricsDashboard(EpaperDisplay):
         self.reset_canvas()
         self._draw_zone(layout.SOLAR, layout.STYLE_SOLAR)
         self._draw_zone(layout.HOUSE_BATTERY, layout.STYLE_BATTERY)
-        self._draw_zone(layout.ANKER, layout.STYLE_BATTERY)
         self._draw_flow_arrows()
         self._draw_solar(metrics)
         self._draw_house_battery(metrics)
-        self._draw_anker(metrics)
+        self._draw_updated_at(metrics)
 
     def _draw_zone(self, zone: layout.Zone, style: layout.PanelStyle) -> None:
         self._draw.rectangle(
             (zone.x, zone.y, zone.x1 - 1, zone.y1 - 1),
             fill=style.fill,
-            outline=style.border,
-            width=layout.PANEL_BORDER_WIDTH,
+            outline=style.border if style.border_width else style.fill,
+            width=style.border_width,
         )
 
     def _draw_flow_arrows(self) -> None:
         self._draw_arrow(*layout.ARROW_SOLAR_TO_HOUSE, fill=layout.BLACK)
-        self._draw_arrow(*layout.ARROW_HOUSE_TO_ANKER, fill=layout.BLACK)
 
     def _draw_arrow(
         self,
@@ -104,7 +102,7 @@ class MetricsDashboard(EpaperDisplay):
         y: int,
         style: layout.PanelStyle,
     ) -> None:
-        """Right-aligned caption (Inter Medium Italic 13px)."""
+        """Right-aligned caption (Inter Medium Italic 14px)."""
         font = self._font_caption
         bbox = self._draw.textbbox((0, 0), text, font=font)
         width = bbox[2] - bbox[0]
@@ -175,34 +173,12 @@ class MetricsDashboard(EpaperDisplay):
                 style,
             )
 
-    def _draw_anker(self, metrics: VanMetrics) -> None:
-        style = layout.STYLE_BATTERY
-        self._text(layout.LABEL_ANKER, layout.ANKER_LABEL, self._font_label, style)
-        self._text(
-            fmt(metrics.anker.soc_percent, suffix="%"),
-            layout.ANKER_SOC,
-            self._font_hero,
-            style,
-        )
-        self._text(
-            fmt_anker_net(metrics.anker.power_in_w, metrics.anker.power_out_w),
-            layout.ANKER_NET_POWER,
-            self._font_body,
-            style,
-        )
-        self._draw_caption_right(
-            f"{config.ANKER_CAPACITY_KWH} kWh capacity",
-            layout.ANKER,
-            layout.ANKER_CAPACITY_CAPTION_Y,
-            style,
-        )
-        if metrics.anker.error:
-            self._text(
-                metrics.anker.error[:28],
-                (layout.ANKER.x + 8, layout.ANKER.y + 8),
-                self._font_label,
-                style,
-            )
+    def _draw_updated_at(self, metrics: VanMetrics) -> None:
+        stamp = fmt_updated_at(metrics.updated_at)
+        if not stamp:
+            return
+        style = layout.STYLE_SOLAR
+        self._text(stamp, layout.UPDATED_AT, self._font_label, style)
 
     def show_metrics(self, metrics: VanMetrics, *, partial: bool = False) -> None:
         self.render(metrics)

@@ -7,7 +7,6 @@ import time
 from datetime import datetime
 
 import config
-from van_monitor.collectors.anker import read_anker
 from van_monitor.collectors.litime import read_litime
 from van_monitor.collectors.victron import read_victron
 from van_monitor.metrics import VanMetrics
@@ -27,6 +26,10 @@ def poll_all() -> VanMetrics:
     Devices are polled sequentially because the Pi Zero W BLE radio handles
     one connection at a time more reliably than overlapping operations.
     Victron is passive (advertisements only) and runs between connect cycles.
+
+    Anker is intentionally omitted: SolixBLE connects to the C1000 Gen 2 but
+    does not yet deliver telemetry (see README). Use scripts/test_anker.py to
+    experiment with the collector in isolation.
     """
     metrics = VanMetrics()
 
@@ -36,10 +39,6 @@ def poll_all() -> VanMetrics:
 
     logger.info("Polling Victron...")
     metrics.victron = read_victron()
-    _cooldown()
-
-    logger.info("Polling Anker...")
-    metrics.anker = read_anker()
 
     metrics.updated_at = datetime.now()
     return metrics

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Preview the Figma Main screen v3 layout on the e-paper with sample P0 values.
+Preview the Figma Main screen v4 layout on the e-paper with sample P0 values.
 
 Run on the Raspberry Pi:
     .venv/bin/python3 scripts/test_dashboard_layout.py
@@ -18,23 +18,17 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from van_monitor.dashboard import MetricsDashboard
-from van_monitor.metrics import AnkerMetrics, LitimeMetrics, VanMetrics, VictronMetrics
+from van_monitor.metrics import LitimeMetrics, VanMetrics, VictronMetrics
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 
 def sample_metrics() -> VanMetrics:
-    """Example readings matching the Figma mockup."""
+    """Example readings matching the Figma mockup (node 21:30)."""
     return VanMetrics(
         litime=LitimeMetrics(soc_percent=86, power_w=40, voltage_v=12.4, connected=True),
-        victron=VictronMetrics(solar_power_w=202, yield_today_wh=645, connected=True),
-        anker=AnkerMetrics(
-            soc_percent=92,
-            power_in_w=162,
-            power_out_w=880,  # net displays as -718 W
-            connected=True,
-        ),
-        updated_at=datetime.now(),
+        victron=VictronMetrics(solar_power_w=202, yield_today_wh=1000, connected=True),
+        updated_at=datetime(2026, 6, 10, 16, 30),
     )
 
 

@@ -19,10 +19,9 @@ FULL_REFRESH_INTERVAL_SECONDS = 3600
 # Shown when a device is disconnected or data is unavailable.
 UNAVAILABLE_LABEL = "NA"
 
-# Static captions shown on the dashboard (Main screen v2). Edit to match your gear.
+# Static captions shown on the dashboard (Main screen v4 w/o Anker).
 SOLAR_MAX_W = 220
 HOUSE_BATTERY_CAPACITY_KWH = 2
-ANKER_CAPACITY_KWH = 1
 
 # ---------------------------------------------------------------------------
 # Bluetooth device addresses
@@ -41,7 +40,7 @@ LITIME_ADDRESS = "C8:47:80:3F:8B:64"
 VICTRON_ADDRESS = "F6:76:F4:A0:59:A7"
 VICTRON_KEY = "5396e672b53fa0194d9b5730508bb1aa"  # 32-character hex advertisement key
 
-# Anker Solix C1000 Gen 2 portable power station.
+# Anker Solix C1000 Gen 2 (used by scripts/test_anker.py only — not polled by run_monitor).
 ANKER_ADDRESS = "7C:E9:13:31:84:52"
 
 # Seconds to wait when scanning before connect (Pi Zero W: allow 20–30).

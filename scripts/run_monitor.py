@@ -5,7 +5,9 @@ Poll all BLE devices and show P0 metrics on the e-paper display.
 Test each device individually first:
     scripts/test_litime.py
     scripts/test_victron.py
-    scripts/test_anker.py
+
+Anker is not polled here (SolixBLE lacks C1000 Gen 2 telemetry). Use
+scripts/test_anker.py to experiment with that collector in isolation.
 """
 
 from __future__ import annotations
