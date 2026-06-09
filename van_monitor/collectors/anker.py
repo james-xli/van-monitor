@@ -15,10 +15,15 @@ from van_monitor.metrics import AnkerMetrics
 
 logger = logging.getLogger(__name__)
 
-_STATUS_CMD = bytes.fromhex("4040")
-_STATUS_PAYLOAD = bytes.fromhex("a10121")
-_STATUS_PATTERN = bytes.fromhex("03010f")
-_STATUS_RESPONSE = bytes.fromhex("c840")
+# Gen 2 (A1763): realtime trigger then optional status request (anker-solix-api BLE map).
+_RT_CMD = bytes.fromhex("0057")
+_RT_PAYLOAD = bytes.fromhex("a10122a2020101a305033c000000")  # enable, 60s window
+_STATUS_G2_CMD = bytes.fromhex("0040")
+_STATUS_G2_PAYLOAD = bytes.fromhex("a10122")
+
+# Gen 1 (A1761) fallback.
+_STATUS_G1_CMD = bytes.fromhex("4040")
+_STATUS_G1_PAYLOAD = bytes.fromhex("a10121")
 
 
 def _valid_int(value: int) -> int | None:
@@ -76,27 +81,19 @@ async def _request_status_update(anker: C1000G2, *, packet_timeout: float) -> bo
     """
     Ask the unit for a status snapshot.
 
-    Gen 2 usually answers with c402/c405 fragments handled by the notification
-    callback, not the Gen 1 c840 pair that C1000.get_status_update() waits for.
+    Gen 2 (A1763) uses 0057 realtime trigger or 0040 status request — not the
+    Gen 1 4040/c840 pair. Replies arrive as c402/c405 via the notify handler.
     """
-    await anker._send_command(_STATUS_CMD, _STATUS_PAYLOAD)
-
-    if await _wait_for_telemetry(anker, timeout=packet_timeout):
-        return True
-
-    logger.info("Anker: no c402 telemetry yet; waiting for c840 response...")
-    packet_1 = await anker._listen_for_packet(
-        _STATUS_PATTERN, _STATUS_RESPONSE, timeout=int(packet_timeout)
+    triggers = (
+        ("realtime trigger 0057", _RT_CMD, _RT_PAYLOAD),
+        ("status request 0040", _STATUS_G2_CMD, _STATUS_G2_PAYLOAD),
+        ("Gen1 status 4040", _STATUS_G1_CMD, _STATUS_G1_PAYLOAD),
     )
-    packet_2 = await anker._listen_for_packet(
-        _STATUS_PATTERN, _STATUS_RESPONSE, timeout=int(packet_timeout)
-    )
-    if not packet_1 or not packet_2:
-        return anker.available
-
-    decrypted = anker._decrypt_payload(packet_1[1:] + packet_2[1:])
-    parameters = anker._parse_payload(decrypted)
-    await anker._process_telemetry(parameters)
+    for label, cmd, payload in triggers:
+        logger.info("Anker: sending %s...", label)
+        await anker._send_command(cmd, payload)
+        if await _wait_for_telemetry(anker, timeout=packet_timeout):
+            return True
     return anker.available
 
 
@@ -112,7 +109,7 @@ async def read_anker_async(
     """
     metrics = AnkerMetrics()
     wait_seconds = telemetry_timeout or config.ANKER_TELEMETRY_TIMEOUT_SECONDS
-    poll_timeout = min(20.0, wait_seconds / 4)
+    poll_timeout = min(15.0, wait_seconds / 6)
 
     device = await _find_anker_device(address)
     if not device:
@@ -144,7 +141,10 @@ async def read_anker_async(
                     if await _request_status_update(anker, packet_timeout=poll_timeout):
                         break
                 except Exception as exc:
-                    logger.warning("Anker: status request failed: %s", exc)
+                    logger.warning(
+                        "Anker: status request failed: %s",
+                        exc or type(exc).__name__,
+                    )
                 await asyncio.sleep(2)
 
         if not anker.available:
