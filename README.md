@@ -165,6 +165,22 @@ Terminal-only mode (no e-paper):
 .venv/bin/python3 scripts/run_monitor.py --once --no-display -v
 ```
 
+## Battery / solar history
+
+`run_monitor.py` logs battery SOC % and solar power to `data/history.jsonl`
+(one JSON object per line). The log:
+
+- samples at most every `HISTORY_SAMPLE_INTERVAL_SECONDS` (default 60s),
+  independent of the faster display poll — 5s resolution can't be shown on a
+  chart with ~98s per pixel and only wears the SD card,
+- persists across reboots (the service reloads it on start),
+- is pruned to the last `HISTORY_WINDOW_HOURS` (default 12h),
+- is excluded from `deploy.sh` (so deploys never overwrite Pi data) and from git.
+
+The house battery panel's black background is a 12h SOC chart: fill height equals
+SOC% at that time, the latest reading is at the right edge, and thin vertical lines
+mark each hour counting back from now. Solar history is collected but not yet shown.
+
 ## Configuration
 
 Edit `config.py`:
@@ -177,6 +193,10 @@ Edit `config.py`:
 | `UNAVAILABLE_LABEL` | Shown when a device is disconnected (default: `NA`) |
 | `SOLAR_MAX_W` | Solar panel caption, e.g. `220 W max` |
 | `HOUSE_BATTERY_CAPACITY_KWH` | House battery caption, e.g. `2 kWh capacity` |
+| `HISTORY_WINDOW_HOURS` | Hours of SOC/solar history to keep and chart (default 12) |
+| `HISTORY_SAMPLE_INTERVAL_SECONDS` | Min seconds between logged points (default 60; decoupled from poll) |
+| `HISTORY_GRID_HOURS` | Spacing of the battery chart's hour gridlines (default 1) |
+| `HISTORY_FILE` | Where the time-series log is stored (default `data/history.jsonl`) |
 | `LITIME_ADDRESS` | Li-Time battery MAC (empty = auto-discover) |
 | `VICTRON_ADDRESS` | Victron MPPT MAC |
 | `VICTRON_KEY` | Victron Instant Readout advertisement key |

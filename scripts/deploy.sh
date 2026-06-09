@@ -13,6 +13,7 @@ rsync -avz --delete \
   --exclude '.venv/' \
   --exclude '__pycache__/' \
   --exclude '*.pyc' \
+  --exclude 'data/' \
   "$REPO_DIR/" "$PI_HOST:$PI_DIR/"
 
 echo ""

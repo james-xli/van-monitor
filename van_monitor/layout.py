@@ -81,6 +81,9 @@ STYLE_BATTERY = PanelStyle(
 
 TEXT_STROKE_WIDTH = 1
 
+# House battery text sits over a variable SOC chart, so it uses a thicker halo.
+HOUSE_TEXT_STROKE_WIDTH = 5
+
 
 def _abs(frame: Zone, left: int, top: int) -> tuple[int, int]:
     """Convert Figma position inside a panel to absolute screen coordinates."""

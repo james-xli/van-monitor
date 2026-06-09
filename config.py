@@ -4,6 +4,8 @@ Central configuration for van-monitor.
 Edit these values in the field as needed. Keep settings simple and obvious.
 """
 
+import os
+
 # How often to poll Bluetooth devices for new readings (seconds).
 POLL_INTERVAL_SECONDS = 5
 
@@ -22,6 +24,25 @@ UNAVAILABLE_LABEL = "NA"
 # Static captions shown on the dashboard (Main screen v4 w/o Anker).
 SOLAR_MAX_W = 220
 HOUSE_BATTERY_CAPACITY_KWH = 2
+
+# ---------------------------------------------------------------------------
+# Battery / solar history (logged every poll, persisted across reboots)
+# ---------------------------------------------------------------------------
+
+# Hours of history to keep and chart; older data is discarded.
+HISTORY_WINDOW_HOURS = 12
+
+# Minimum seconds between logged history points. Decoupled from the (faster)
+# display poll: 5s resolution can't be shown on a ~98s-per-pixel chart and just
+# wears the SD card. 60s keeps ~720 points over 12h (still finer than the chart).
+HISTORY_SAMPLE_INTERVAL_SECONDS = 60
+
+# Spacing of the vertical hour gridlines on the battery chart (hours).
+HISTORY_GRID_HOURS = 1
+
+# Time-series log file. Stored in the repo's data/ folder so it survives reboots;
+# deploy.sh excludes data/ so deploys do not overwrite it.
+HISTORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "history.jsonl")
 
 # ---------------------------------------------------------------------------
 # Bluetooth device addresses

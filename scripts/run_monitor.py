@@ -25,6 +25,7 @@ if str(ROOT) not in sys.path:
 import config
 from van_monitor.collectors import poll_all
 from van_monitor.dashboard import MetricsDashboard
+from van_monitor.history import MetricsHistory
 from van_monitor.metrics import print_metrics
 from van_monitor.util import setup_logging
 
@@ -42,6 +43,8 @@ def _update_dashboard(
     dashboard: MetricsDashboard,
     metrics,
     *,
+    history,
+    now: float,
     partial_mode: bool,
     force_full: bool,
     last_full_refresh: float,
@@ -58,11 +61,11 @@ def _update_dashboard(
                 config.FULL_REFRESH_INTERVAL_SECONDS,
             )
         dashboard.init(partial=False)
-        dashboard.show_metrics(metrics, partial=False)
+        dashboard.show_metrics(metrics, history=history, now=now, partial=False)
         dashboard.init(partial=True)
         return True, time.monotonic()
 
-    dashboard.show_metrics(metrics, partial=True)
+    dashboard.show_metrics(metrics, history=history, now=now, partial=True)
     return partial_mode, last_full_refresh
 
 
@@ -91,6 +94,7 @@ def main() -> int:
     dashboard = None
     partial_mode = False
     last_full_refresh = time.monotonic()
+    history = MetricsHistory()
 
     if not args.no_display:
         dashboard = MetricsDashboard()
@@ -99,14 +103,23 @@ def main() -> int:
         dashboard.show_status_message("Polling BLE devices...")
 
     while True:
+        now = time.time()
         metrics = poll_all()
         print_metrics(metrics)
+
+        history.record(
+            metrics.litime.soc_percent,
+            metrics.victron.solar_power_w,
+            now=now,
+        )
 
         if dashboard:
             force_full = _should_full_refresh(last_full_refresh)
             partial_mode, last_full_refresh = _update_dashboard(
                 dashboard,
                 metrics,
+                history=history.points(),
+                now=now,
                 partial_mode=partial_mode,
                 force_full=force_full,
                 last_full_refresh=last_full_refresh,

@@ -2,9 +2,17 @@
 Render P0 van metrics on the e-paper display.
 
 Layout matches Figma "Main screen v4 w/o Anker" (node 21:30), strict B/W, no chart fills.
+
+The house battery panel's black background is a 12h SOC area chart: the latest SOC
+sits at the right edge, fill height at each column equals SOC% at that time, and thin
+vertical lines mark each 1h increment counting back from now.
 """
 
 from __future__ import annotations
+
+import time
+from collections.abc import Sequence
+from typing import Protocol
 
 from PIL import ImageFont
 
@@ -21,6 +29,11 @@ from van_monitor.metrics import (
 )
 
 
+class _SocPoint(Protocol):
+    t: float
+    soc: float | None
+
+
 class MetricsDashboard(EpaperDisplay):
     """Draw P0 metrics in fixed zones (Figma Main screen v4 w/o Anker)."""
 
@@ -31,11 +44,19 @@ class MetricsDashboard(EpaperDisplay):
         self._font_hero = load_bold_font(layout.FONT_HERO)
         self._font_caption = load_caption_font(layout.FONT_CAPTION)
 
-    def render(self, metrics: VanMetrics) -> None:
+    def render(
+        self,
+        metrics: VanMetrics,
+        *,
+        history: Sequence[_SocPoint] | None = None,
+        now: float | None = None,
+    ) -> None:
         """Redraw the full metrics screen."""
+        if now is None:
+            now = time.time()
         self.reset_canvas()
         self._draw_zone(layout.SOLAR, layout.STYLE_SOLAR)
-        self._draw_house_battery_background(metrics.litime.soc_percent)
+        self._draw_house_battery_background(history or [], now)
         self._draw_flow_arrows()
         self._draw_solar(metrics)
         self._draw_house_battery(metrics)
@@ -48,6 +69,101 @@ class MetricsDashboard(EpaperDisplay):
             outline=style.border if style.border_width else style.fill,
             width=style.border_width,
         )
+
+    # --- house battery SOC history chart ------------------------------------
+
+    def _soc_to_y(self, soc: float) -> int:
+        """Absolute screen Y for the top of a black SOC column (100% = full height)."""
+        zone = layout.HOUSE_BATTERY
+        soc = max(0.0, min(100.0, soc))
+        fill_height = int(round(zone.height * soc / 100.0))
+        return zone.y + zone.height - fill_height
+
+    def _column_soc(
+        self,
+        history: Sequence[_SocPoint],
+        now: float,
+        window: float,
+        width: int,
+    ) -> list[float | None]:
+        """
+        Map each pixel column to a SOC via sample-and-hold (last known value).
+
+        Columns earlier than the first data point stay None (drawn white), which
+        keeps the chart time-accurate after a fresh boot.
+        """
+        col_soc: list[float | None] = [None] * width
+        points = sorted(
+            ((p.t, p.soc) for p in history if p.soc is not None),
+            key=lambda item: item[0],
+        )
+        if not points or width <= 0:
+            return col_soc
+
+        start = now - window
+        idx = 0
+        last = len(points) - 1
+        for col in range(width):
+            col_time = now if width == 1 else start + (col / (width - 1)) * window
+            while idx < last and points[idx + 1][0] <= col_time:
+                idx += 1
+            if points[idx][0] <= col_time:
+                col_soc[col] = points[idx][1]
+        return col_soc
+
+    def _draw_house_battery_background(
+        self,
+        history: Sequence[_SocPoint],
+        now: float,
+    ) -> None:
+        zone = layout.HOUSE_BATTERY
+        window = config.HISTORY_WINDOW_HOURS * 3600
+
+        self._draw.rectangle((zone.x, zone.y, zone.x1 - 1, zone.y1 - 1), fill=layout.WHITE)
+
+        col_soc = self._column_soc(history, now, window, zone.width)
+        for col, soc in enumerate(col_soc):
+            if soc is None:
+                continue
+            x = zone.x + col
+            fill_top = self._soc_to_y(soc)
+            if fill_top <= zone.y1 - 1:
+                self._draw.line((x, fill_top, x, zone.y1 - 1), fill=layout.BLACK)
+
+        self._draw_house_gridlines(zone, now, window, col_soc)
+
+        # Border marks the full 100% frame.
+        self._draw.rectangle(
+            (zone.x, zone.y, zone.x1 - 1, zone.y1 - 1),
+            outline=layout.BLACK,
+            width=layout.HOUSE_BATTERY_BORDER_WIDTH,
+        )
+
+    def _draw_house_gridlines(
+        self,
+        zone: layout.Zone,
+        now: float,
+        window: float,
+        col_soc: list[float | None],
+    ) -> None:
+        grid = config.HISTORY_GRID_HOURS * 3600
+        if grid <= 0 or zone.width <= 1:
+            return
+        k = 1
+        while k * grid < window:
+            frac = 1.0 - (k * grid) / window
+            col = int(round(frac * (zone.width - 1)))
+            k += 1
+            if col <= 0 or col >= zone.width:
+                continue
+            x = zone.x + col
+            soc = col_soc[col]
+            fill_top = self._soc_to_y(soc) if soc is not None else zone.y1
+            # Black gridline in the white area only; it stops where the SOC fill begins.
+            if fill_top - 1 >= zone.y:
+                self._draw.line((x, zone.y, x, fill_top - 1), fill=layout.BLACK)
+
+    # --- flow arrows --------------------------------------------------------
 
     def _draw_flow_arrows(self) -> None:
         self._draw_arrow(*layout.ARROW_SOLAR_TO_HOUSE, fill=layout.BLACK)
@@ -79,19 +195,25 @@ class MetricsDashboard(EpaperDisplay):
                 fill=fill,
             )
 
+    # --- text helpers -------------------------------------------------------
+
     def _text(
         self,
         text: str,
         xy: tuple[int, int],
         font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
         style: layout.PanelStyle,
+        *,
+        stroke_width: int | None = None,
     ) -> None:
+        if stroke_width is None:
+            stroke_width = layout.TEXT_STROKE_WIDTH
         self._draw.text(
             xy,
             text,
             font=font,
             fill=style.text_fill,
-            stroke_width=layout.TEXT_STROKE_WIDTH,
+            stroke_width=stroke_width,
             stroke_fill=style.text_stroke,
         )
 
@@ -101,45 +223,17 @@ class MetricsDashboard(EpaperDisplay):
         zone: layout.Zone,
         y: int,
         style: layout.PanelStyle,
+        *,
+        stroke_width: int | None = None,
     ) -> None:
         """Right-aligned caption (Inter Medium Italic 14px)."""
         font = self._font_caption
         bbox = self._draw.textbbox((0, 0), text, font=font)
         width = bbox[2] - bbox[0]
         x = zone.x1 - width - layout.CAPTION_RIGHT_MARGIN
-        self._text(text, (x, y), font, style)
+        self._text(text, (x, y), font, style, stroke_width=stroke_width)
 
-    def _house_battery_fill_top(self, soc_percent: float | None) -> int:
-        """Absolute screen Y where the black SOC fill begins (fills up from bottom)."""
-        zone = layout.HOUSE_BATTERY
-        if soc_percent is None:
-            return zone.y1
-        soc = max(0.0, min(100.0, soc_percent))
-        fill_height = int(round(zone.height * soc / 100.0))
-        return zone.y + zone.height - fill_height
-
-    def _draw_house_battery_background(self, soc_percent: float | None) -> None:
-        """White panel with black fill height proportional to SOC (100% = full black)."""
-        zone = layout.HOUSE_BATTERY
-        self._draw.rectangle(
-            (zone.x, zone.y, zone.x1 - 1, zone.y1 - 1),
-            fill=layout.WHITE,
-        )
-        fill_top = self._house_battery_fill_top(soc_percent)
-        if fill_top < zone.y1:
-            self._draw.rectangle(
-                (zone.x, fill_top, zone.x1 - 1, zone.y1 - 1),
-                fill=layout.BLACK,
-            )
-        self._draw.rectangle(
-            (zone.x, zone.y, zone.x1 - 1, zone.y1 - 1),
-            outline=layout.BLACK,
-            width=layout.HOUSE_BATTERY_BORDER_WIDTH,
-        )
-
-    def _house_text_style(self, y: int, fill_top: int) -> layout.PanelStyle:
-        """White text on the black fill; black text on the unfilled area above."""
-        return layout.STYLE_BATTERY if y >= fill_top else layout.STYLE_SOLAR
+    # --- panels -------------------------------------------------------------
 
     def _draw_solar(self, metrics: VanMetrics) -> None:
         style = layout.STYLE_SOLAR
@@ -171,44 +265,45 @@ class MetricsDashboard(EpaperDisplay):
             )
 
     def _draw_house_battery(self, metrics: VanMetrics) -> None:
-        fill_top = self._house_battery_fill_top(metrics.litime.soc_percent)
-
-        self._text(
-            layout.LABEL_HOUSE,
-            layout.HOUSE_LABEL,
-            self._font_label,
-            self._house_text_style(layout.HOUSE_LABEL[1], fill_top),
-        )
+        # White text with a black halo stays readable over the variable SOC chart.
+        style = layout.STYLE_BATTERY
+        sw = layout.HOUSE_TEXT_STROKE_WIDTH
+        self._text(layout.LABEL_HOUSE, layout.HOUSE_LABEL, self._font_label, style, stroke_width=sw)
         self._text(
             fmt(metrics.litime.soc_percent, suffix="%"),
             layout.HOUSE_SOC,
             self._font_hero,
-            self._house_text_style(layout.HOUSE_SOC[1], fill_top),
+            style,
+            stroke_width=sw,
         )
         self._text(
             fmt_signed_watts(metrics.litime.power_w),
             layout.HOUSE_POWER,
             self._font_body,
-            self._house_text_style(layout.HOUSE_POWER[1], fill_top),
+            style,
+            stroke_width=sw,
         )
         self._text(
             fmt(metrics.litime.voltage_v, decimals=1, suffix=" V"),
             layout.HOUSE_VOLTAGE,
             self._font_body,
-            self._house_text_style(layout.HOUSE_VOLTAGE[1], fill_top),
+            style,
+            stroke_width=sw,
         )
         self._draw_caption_right(
             f"{config.HOUSE_BATTERY_CAPACITY_KWH} kWh capacity",
             layout.HOUSE_BATTERY,
             layout.HOUSE_CAPACITY_CAPTION_Y,
-            self._house_text_style(layout.HOUSE_CAPACITY_CAPTION_Y, fill_top),
+            style,
+            stroke_width=sw,
         )
         if metrics.litime.error:
             self._text(
                 metrics.litime.error[:28],
                 (layout.HOUSE_BATTERY.x + 8, layout.HOUSE_BATTERY.y + 8),
                 self._font_label,
-                layout.STYLE_SOLAR,
+                style,
+                stroke_width=sw,
             )
 
     def _draw_updated_at(self, metrics: VanMetrics) -> None:
@@ -218,8 +313,17 @@ class MetricsDashboard(EpaperDisplay):
         style = layout.STYLE_SOLAR
         self._text(stamp, layout.UPDATED_AT, self._font_label, style)
 
-    def show_metrics(self, metrics: VanMetrics, *, partial: bool = False) -> None:
-        self.render(metrics)
+    # --- public API ---------------------------------------------------------
+
+    def show_metrics(
+        self,
+        metrics: VanMetrics,
+        *,
+        history: Sequence[_SocPoint] | None = None,
+        now: float | None = None,
+        partial: bool = False,
+    ) -> None:
+        self.render(metrics, history=history, now=now)
         self.refresh(partial=partial)
 
     def show_status_message(self, message: str) -> None:
