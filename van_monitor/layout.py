@@ -69,13 +69,14 @@ STYLE_SOLAR = PanelStyle(
     border_width=2,
 )
 
-# House battery panel (21:47): black fill, no border
+# House battery panel (21:47): black SOC fill from bottom, border marks 100% frame
+HOUSE_BATTERY_BORDER_WIDTH = 2
 STYLE_BATTERY = PanelStyle(
     fill=BLACK,
     border=BLACK,
     text_fill=WHITE,
     text_stroke=BLACK,
-    border_width=0,
+    border_width=HOUSE_BATTERY_BORDER_WIDTH,
 )
 
 TEXT_STROKE_WIDTH = 1

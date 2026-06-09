@@ -35,7 +35,7 @@ class MetricsDashboard(EpaperDisplay):
         """Redraw the full metrics screen."""
         self.reset_canvas()
         self._draw_zone(layout.SOLAR, layout.STYLE_SOLAR)
-        self._draw_zone(layout.HOUSE_BATTERY, layout.STYLE_BATTERY)
+        self._draw_house_battery_background(metrics.litime.soc_percent)
         self._draw_flow_arrows()
         self._draw_solar(metrics)
         self._draw_house_battery(metrics)
@@ -109,6 +109,38 @@ class MetricsDashboard(EpaperDisplay):
         x = zone.x1 - width - layout.CAPTION_RIGHT_MARGIN
         self._text(text, (x, y), font, style)
 
+    def _house_battery_fill_top(self, soc_percent: float | None) -> int:
+        """Absolute screen Y where the black SOC fill begins (fills up from bottom)."""
+        zone = layout.HOUSE_BATTERY
+        if soc_percent is None:
+            return zone.y1
+        soc = max(0.0, min(100.0, soc_percent))
+        fill_height = int(round(zone.height * soc / 100.0))
+        return zone.y + zone.height - fill_height
+
+    def _draw_house_battery_background(self, soc_percent: float | None) -> None:
+        """White panel with black fill height proportional to SOC (100% = full black)."""
+        zone = layout.HOUSE_BATTERY
+        self._draw.rectangle(
+            (zone.x, zone.y, zone.x1 - 1, zone.y1 - 1),
+            fill=layout.WHITE,
+        )
+        fill_top = self._house_battery_fill_top(soc_percent)
+        if fill_top < zone.y1:
+            self._draw.rectangle(
+                (zone.x, fill_top, zone.x1 - 1, zone.y1 - 1),
+                fill=layout.BLACK,
+            )
+        self._draw.rectangle(
+            (zone.x, zone.y, zone.x1 - 1, zone.y1 - 1),
+            outline=layout.BLACK,
+            width=layout.HOUSE_BATTERY_BORDER_WIDTH,
+        )
+
+    def _house_text_style(self, y: int, fill_top: int) -> layout.PanelStyle:
+        """White text on the black fill; black text on the unfilled area above."""
+        return layout.STYLE_BATTERY if y >= fill_top else layout.STYLE_SOLAR
+
     def _draw_solar(self, metrics: VanMetrics) -> None:
         style = layout.STYLE_SOLAR
         self._text(layout.LABEL_SOLAR, layout.SOLAR_LABEL, self._font_label, style)
@@ -139,38 +171,44 @@ class MetricsDashboard(EpaperDisplay):
             )
 
     def _draw_house_battery(self, metrics: VanMetrics) -> None:
-        style = layout.STYLE_BATTERY
-        self._text(layout.LABEL_HOUSE, layout.HOUSE_LABEL, self._font_label, style)
+        fill_top = self._house_battery_fill_top(metrics.litime.soc_percent)
+
+        self._text(
+            layout.LABEL_HOUSE,
+            layout.HOUSE_LABEL,
+            self._font_label,
+            self._house_text_style(layout.HOUSE_LABEL[1], fill_top),
+        )
         self._text(
             fmt(metrics.litime.soc_percent, suffix="%"),
             layout.HOUSE_SOC,
             self._font_hero,
-            style,
+            self._house_text_style(layout.HOUSE_SOC[1], fill_top),
         )
         self._text(
             fmt_signed_watts(metrics.litime.power_w),
             layout.HOUSE_POWER,
             self._font_body,
-            style,
+            self._house_text_style(layout.HOUSE_POWER[1], fill_top),
         )
         self._text(
             fmt(metrics.litime.voltage_v, decimals=1, suffix=" V"),
             layout.HOUSE_VOLTAGE,
             self._font_body,
-            style,
+            self._house_text_style(layout.HOUSE_VOLTAGE[1], fill_top),
         )
         self._draw_caption_right(
             f"{config.HOUSE_BATTERY_CAPACITY_KWH} kWh capacity",
             layout.HOUSE_BATTERY,
             layout.HOUSE_CAPACITY_CAPTION_Y,
-            style,
+            self._house_text_style(layout.HOUSE_CAPACITY_CAPTION_Y, fill_top),
         )
         if metrics.litime.error:
             self._text(
                 metrics.litime.error[:28],
                 (layout.HOUSE_BATTERY.x + 8, layout.HOUSE_BATTERY.y + 8),
                 self._font_label,
-                style,
+                layout.STYLE_SOLAR,
             )
 
     def _draw_updated_at(self, metrics: VanMetrics) -> None:
