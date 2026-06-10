@@ -88,6 +88,15 @@ SOLAR_TEXT_STROKE_WIDTH = 5
 # Solar panel y-axis is 0..config.SOLAR_MAX_W; the history line is stroke-only (no fill).
 SOLAR_LINE_WIDTH = 2
 
+# Spacing (in SOC %) of the horizontal gridlines on the battery chart.
+SOC_GRID_STEP = 10
+
+# Length (px) of the SOC tickmarks drawn just inside the chart's right edge.
+SOC_TICK_LENGTH = 10
+
+# Length (px) of the hour tickmarks hanging from the chart's top inside edge.
+HOUR_TICK_LENGTH = 10
+
 
 def _abs(frame: Zone, left: int, top: int) -> tuple[int, int]:
     """Convert Figma position inside a panel to absolute screen coordinates."""

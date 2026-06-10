@@ -154,13 +154,12 @@ class MetricsDashboard(EpaperDisplay):
             if fill_top <= zone.y1 - 1:
                 self._draw.line((x, fill_top, x, zone.y1 - 1), fill=layout.BLACK)
 
-        # Hour gridlines, black, only in the white area above the SOC fill.
+        # Vertical hour gridlines, black, only in the white area above the fill.
         for col in self._hour_gridline_columns(window, zone.width):
-            x = zone.x + col
             soc = col_soc[col]
             fill_top = self._value_to_y(zone, soc, 100.0) if soc is not None else zone.y1
             if fill_top - 1 >= zone.y:
-                self._draw.line((x, zone.y, x, fill_top - 1), fill=layout.BLACK)
+                self._draw.line((zone.x + col, zone.y, zone.x + col, fill_top - 1), fill=layout.BLACK)
 
         # Border marks the full 100% frame.
         self._draw.rectangle(
@@ -183,13 +182,12 @@ class MetricsDashboard(EpaperDisplay):
         col_w = self._column_series(history, now, window, zone.width, lambda p: p.solar)
         vmax = float(config.SOLAR_MAX_W)
 
-        # Hour gridlines, black, only above the line (mirrors the battery panel).
+        # Hour gridlines, black, only in the area above the line (mirrors the battery panel).
         for col in self._hour_gridline_columns(window, zone.width):
-            x = zone.x + col
             value = col_w[col]
             line_y = self._value_to_y(zone, value, vmax) if value is not None else zone.y1
             if line_y - 1 >= zone.y:
-                self._draw.line((x, zone.y, x, line_y - 1), fill=layout.BLACK)
+                self._draw.line((zone.x + col, zone.y, zone.x + col, line_y - 1), fill=layout.BLACK)
 
         run: list[tuple[int, int]] = []
         for col, value in enumerate(col_w):
