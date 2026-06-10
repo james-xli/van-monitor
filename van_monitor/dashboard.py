@@ -189,13 +189,20 @@ class MetricsDashboard(EpaperDisplay):
             if line_y - 1 >= zone.y:
                 self._draw.line((zone.x + col, zone.y, zone.x + col, line_y - 1), fill=layout.BLACK)
 
+        # Keep the full stroke width inside the frame (0 W would otherwise spill
+        # below the bottom border).
+        half = layout.SOLAR_LINE_WIDTH // 2
+        y_min = zone.y + half
+        y_max = zone.y1 - 1 - half
         run: list[tuple[int, int]] = []
         for col, value in enumerate(col_w):
             if value is None:
                 self._flush_line(run)
                 run = []
                 continue
-            run.append((zone.x + col, self._value_to_y(zone, value, vmax)))
+            y = self._value_to_y(zone, value, vmax)
+            y = max(y_min, min(y_max, y))
+            run.append((zone.x + col, y))
         self._flush_line(run)
 
         # Redraw border on top so the line/gridlines stay inside a clean frame.
