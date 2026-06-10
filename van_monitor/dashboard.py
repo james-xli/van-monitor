@@ -166,21 +166,25 @@ class MetricsDashboard(EpaperDisplay):
 
         self._draw.rectangle((zone.x, zone.y, zone.x1 - 1, zone.y1 - 1), fill=layout.WHITE)
 
+        # Inverted: the SOC region (bottom-up) stays white; the area above the
+        # curve is filled black. Columns without data stay white (blank).
         col_soc = self._column_series(history, now, window, zone.width, lambda p: p.soc)
         for col, soc in enumerate(col_soc):
             if soc is None:
                 continue
             x = zone.x + col
             fill_top = self._value_to_y(zone, soc, 100.0)
-            if fill_top <= zone.y1 - 1:
-                self._draw.line((x, fill_top, x, zone.y1 - 1), fill=layout.BLACK)
+            if fill_top - 1 >= zone.y:
+                self._draw.line((x, zone.y, x, fill_top - 1), fill=layout.BLACK)
 
-        # Vertical hour gridlines, black, only in the white area above the fill.
+        # Vertical hour gridlines, white, only in the black area above the curve.
         for col in self._hour_gridline_columns(window, zone.width):
             soc = col_soc[col]
-            fill_top = self._value_to_y(zone, soc, 100.0) if soc is not None else zone.y1
+            if soc is None:
+                continue
+            fill_top = self._value_to_y(zone, soc, 100.0)
             if fill_top - 1 >= zone.y:
-                self._draw.line((zone.x + col, zone.y, zone.x + col, fill_top - 1), fill=layout.BLACK)
+                self._draw.line((zone.x + col, zone.y, zone.x + col, fill_top - 1), fill=layout.WHITE)
 
         # Clip the fill out of the rounded corners, then stroke the rounded frame.
         self._clip_corners(zone)
