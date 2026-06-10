@@ -3,7 +3,7 @@ Persistent time-series log of battery SOC and solar power.
 
 Points are kept in memory for fast chart rendering and appended to a JSONL file
 (one JSON object per line) so the history survives reboots. The log is pruned to
-a rolling window (default 12h).
+a rolling retention window (default 24h); the charts display a shorter window.
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ class MetricsHistory:
         self.window_seconds = (
             window_seconds
             if window_seconds is not None
-            else config.HISTORY_WINDOW_HOURS * 3600
+            else config.HISTORY_RETENTION_HOURS * 3600
         )
         self._min_interval = (
             min_interval_seconds

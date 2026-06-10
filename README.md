@@ -174,7 +174,8 @@ Terminal-only mode (no e-paper):
   independent of the faster display poll — 5s resolution can't be shown on a
   chart with ~98s per pixel and only wears the SD card,
 - persists across reboots (the service reloads it on start),
-- is pruned to the last `HISTORY_WINDOW_HOURS` (default 12h),
+- is pruned to the last `HISTORY_RETENTION_HOURS` (default 24h), while the charts
+  display the shorter `HISTORY_WINDOW_HOURS` (default 12h),
 - is excluded from `deploy.sh` (so deploys never overwrite Pi data) and from git.
 
 Both panels show a 12h chart with the latest reading at the right edge and thin
@@ -195,7 +196,8 @@ Edit `config.py`:
 | `UNAVAILABLE_LABEL` | Shown when a device is disconnected (default: `NA`) |
 | `SOLAR_MAX_W` | Solar panel caption, e.g. `220 W max` |
 | `HOUSE_BATTERY_CAPACITY_KWH` | House battery caption, e.g. `2 kWh capacity` |
-| `HISTORY_WINDOW_HOURS` | Hours of SOC/solar history to keep and chart (default 12) |
+| `HISTORY_WINDOW_HOURS` | Hours of SOC/solar history shown on the charts (default 12) |
+| `HISTORY_RETENTION_HOURS` | Hours of history kept in memory/on disk (default 24) |
 | `HISTORY_SAMPLE_INTERVAL_SECONDS` | Min seconds between logged points (default 60; decoupled from poll) |
 | `HISTORY_GRID_HOURS` | Spacing of the battery chart's hour gridlines (default 1) |
 | `HISTORY_FILE` | Where the time-series log is stored (default `data/history.jsonl`) |

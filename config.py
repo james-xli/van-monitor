@@ -29,8 +29,12 @@ HOUSE_BATTERY_CAPACITY_KWH = 2
 # Battery / solar history (logged every poll, persisted across reboots)
 # ---------------------------------------------------------------------------
 
-# Hours of history to keep and chart; older data is discarded.
+# Hours of history shown on the charts (battery + solar). The right edge is "now".
 HISTORY_WINDOW_HOURS = 12
+
+# Hours of history retained in memory and on disk; older data is discarded.
+# Kept longer than the charted window so the data is available for future use.
+HISTORY_RETENTION_HOURS = 24
 
 # Minimum seconds between logged history points. Decoupled from the (faster)
 # display poll: 5s resolution can't be shown on a ~98s-per-pixel chart and just
