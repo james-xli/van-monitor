@@ -88,6 +88,9 @@ SOLAR_TEXT_STROKE_WIDTH = 5
 # Solar panel y-axis is 0..config.SOLAR_MAX_W; the history line is stroke-only (no fill).
 SOLAR_LINE_WIDTH = 2
 
+# Corner radius (px) for the solar and battery panel frames.
+PANEL_CORNER_RADIUS = 8
+
 
 def _abs(frame: Zone, left: int, top: int) -> tuple[int, int]:
     """Convert Figma position inside a panel to absolute screen coordinates."""

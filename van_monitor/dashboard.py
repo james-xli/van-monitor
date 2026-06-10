@@ -14,7 +14,7 @@ import time
 from collections.abc import Sequence
 from typing import Protocol
 
-from PIL import ImageFont
+from PIL import Image, ImageDraw, ImageFont
 
 import config
 from van_monitor.display import EpaperDisplay
@@ -65,11 +65,32 @@ class MetricsDashboard(EpaperDisplay):
         self._draw_house_battery(metrics)
         self._draw_updated_at(metrics)
 
+    def _zone_bbox(self, zone: layout.Zone) -> tuple[int, int, int, int]:
+        return (zone.x, zone.y, zone.x1 - 1, zone.y1 - 1)
+
     def _draw_zone(self, zone: layout.Zone, style: layout.PanelStyle) -> None:
-        self._draw.rectangle(
-            (zone.x, zone.y, zone.x1 - 1, zone.y1 - 1),
+        self._draw.rounded_rectangle(
+            self._zone_bbox(zone),
+            radius=layout.PANEL_CORNER_RADIUS,
             fill=style.fill,
             outline=style.border if style.border_width else style.fill,
+            width=style.border_width,
+        )
+
+    def _clip_corners(self, zone: layout.Zone) -> None:
+        """Whiten the four corner notches so chart content respects the radius."""
+        bbox = self._zone_bbox(zone)
+        notch = Image.new("1", (self.width, self.height), 0)
+        nd = ImageDraw.Draw(notch)
+        nd.rectangle(bbox, fill=1)
+        nd.rounded_rectangle(bbox, radius=layout.PANEL_CORNER_RADIUS, fill=0)
+        self._canvas.paste(layout.WHITE, mask=notch)
+
+    def _draw_panel_border(self, zone: layout.Zone, style: layout.PanelStyle) -> None:
+        self._draw.rounded_rectangle(
+            self._zone_bbox(zone),
+            radius=layout.PANEL_CORNER_RADIUS,
+            outline=style.border,
             width=style.border_width,
         )
 
@@ -161,12 +182,9 @@ class MetricsDashboard(EpaperDisplay):
             if fill_top - 1 >= zone.y:
                 self._draw.line((zone.x + col, zone.y, zone.x + col, fill_top - 1), fill=layout.BLACK)
 
-        # Border marks the full 100% frame.
-        self._draw.rectangle(
-            (zone.x, zone.y, zone.x1 - 1, zone.y1 - 1),
-            outline=layout.BLACK,
-            width=layout.HOUSE_BATTERY_BORDER_WIDTH,
-        )
+        # Clip the fill out of the rounded corners, then stroke the rounded frame.
+        self._clip_corners(zone)
+        self._draw_panel_border(zone, layout.STYLE_BATTERY)
 
     # --- solar power history line chart -------------------------------------
 
@@ -205,12 +223,9 @@ class MetricsDashboard(EpaperDisplay):
             run.append((zone.x + col, y))
         self._flush_line(run)
 
-        # Redraw border on top so the line/gridlines stay inside a clean frame.
-        self._draw.rectangle(
-            (zone.x, zone.y, zone.x1 - 1, zone.y1 - 1),
-            outline=layout.BLACK,
-            width=layout.STYLE_SOLAR.border_width,
-        )
+        # Clip the line/gridlines out of the rounded corners, then stroke the frame.
+        self._clip_corners(zone)
+        self._draw_panel_border(zone, layout.STYLE_SOLAR)
 
     def _flush_line(self, run: list[tuple[int, int]]) -> None:
         if len(run) >= 2:
