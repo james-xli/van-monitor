@@ -55,7 +55,8 @@ def sample_history(now: float) -> list[HistoryPoint]:
         ramp = max(0.0, (frac - floor_frac) / (1 - floor_frac))
         soc = 6 + 80 * ramp + 2 * math.sin(frac * math.pi * 4)
         soc = max(0.0, min(100.0, soc))
-        solar = max(0.0, 200 * math.sin(frac * math.pi))
+        # Daytime hump peaking mid-afternoon; right edge (~202 W) matches the metric.
+        solar = max(0.0, 215.6 * math.sin(frac * math.pi * 0.55 + 0.2))
         points.append(HistoryPoint(t, soc, solar))
     return points
 

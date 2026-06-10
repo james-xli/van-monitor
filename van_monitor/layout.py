@@ -81,8 +81,12 @@ STYLE_BATTERY = PanelStyle(
 
 TEXT_STROKE_WIDTH = 1
 
-# House battery text sits over a variable SOC chart, so it uses a thicker halo.
+# Panel text sits over a chart background, so it uses a thicker halo for contrast.
 HOUSE_TEXT_STROKE_WIDTH = 5
+SOLAR_TEXT_STROKE_WIDTH = 5
+
+# Solar panel y-axis is 0..config.SOLAR_MAX_W; the history line is stroke-only (no fill).
+SOLAR_LINE_WIDTH = 2
 
 
 def _abs(frame: Zone, left: int, top: int) -> tuple[int, int]:

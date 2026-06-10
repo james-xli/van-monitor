@@ -177,9 +177,11 @@ Terminal-only mode (no e-paper):
 - is pruned to the last `HISTORY_WINDOW_HOURS` (default 12h),
 - is excluded from `deploy.sh` (so deploys never overwrite Pi data) and from git.
 
-The house battery panel's black background is a 12h SOC chart: fill height equals
-SOC% at that time, the latest reading is at the right edge, and thin vertical lines
-mark each hour counting back from now. Solar history is collected but not yet shown.
+Both panels show a 12h chart with the latest reading at the right edge and thin
+vertical lines marking each hour counting back from now:
+
+- **House battery** — black area fill; height equals SOC% at that time.
+- **Solar** — a stroke-only line (no fill); height maps 0..`SOLAR_MAX_W`.
 
 ## Configuration
 

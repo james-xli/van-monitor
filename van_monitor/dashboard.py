@@ -29,9 +29,10 @@ from van_monitor.metrics import (
 )
 
 
-class _SocPoint(Protocol):
+class _HistoryPoint(Protocol):
     t: float
     soc: float | None
+    solar: float | None
 
 
 class MetricsDashboard(EpaperDisplay):
@@ -48,15 +49,17 @@ class MetricsDashboard(EpaperDisplay):
         self,
         metrics: VanMetrics,
         *,
-        history: Sequence[_SocPoint] | None = None,
+        history: Sequence[_HistoryPoint] | None = None,
         now: float | None = None,
     ) -> None:
         """Redraw the full metrics screen."""
         if now is None:
             now = time.time()
+        history = history or []
         self.reset_canvas()
         self._draw_zone(layout.SOLAR, layout.STYLE_SOLAR)
-        self._draw_house_battery_background(history or [], now)
+        self._draw_solar_chart(history, now)
+        self._draw_house_battery_background(history, now)
         self._draw_flow_arrows()
         self._draw_solar(metrics)
         self._draw_house_battery(metrics)
@@ -70,35 +73,41 @@ class MetricsDashboard(EpaperDisplay):
             width=style.border_width,
         )
 
-    # --- house battery SOC history chart ------------------------------------
+    # --- shared chart helpers ----------------------------------------------
 
-    def _soc_to_y(self, soc: float) -> int:
-        """Absolute screen Y for the top of a black SOC column (100% = full height)."""
-        zone = layout.HOUSE_BATTERY
-        soc = max(0.0, min(100.0, soc))
-        fill_height = int(round(zone.height * soc / 100.0))
-        return zone.y + zone.height - fill_height
+    def _value_to_y(self, zone: layout.Zone, value: float, vmax: float, vmin: float = 0.0) -> int:
+        """Absolute screen Y for a value mapped onto the zone (vmax = top)."""
+        span = vmax - vmin
+        frac = 0.0 if span <= 0 else (value - vmin) / span
+        frac = max(0.0, min(1.0, frac))
+        height = int(round(zone.height * frac))
+        return zone.y + zone.height - height
 
-    def _column_soc(
+    def _column_series(
         self,
-        history: Sequence[_SocPoint],
+        history: Sequence[_HistoryPoint],
         now: float,
         window: float,
         width: int,
+        value_of,
     ) -> list[float | None]:
         """
-        Map each pixel column to a SOC via sample-and-hold (last known value).
+        Map each pixel column to a value via sample-and-hold (last known value).
 
-        Columns earlier than the first data point stay None (drawn white), which
+        Columns earlier than the first data point stay None (not drawn), which
         keeps the chart time-accurate after a fresh boot.
         """
-        col_soc: list[float | None] = [None] * width
+        col_values: list[float | None] = [None] * width
         points = sorted(
-            ((p.t, p.soc) for p in history if p.soc is not None),
+            (
+                (p.t, value_of(p))
+                for p in history
+                if value_of(p) is not None
+            ),
             key=lambda item: item[0],
         )
         if not points or width <= 0:
-            return col_soc
+            return col_values
 
         start = now - window
         idx = 0
@@ -108,12 +117,27 @@ class MetricsDashboard(EpaperDisplay):
             while idx < last and points[idx + 1][0] <= col_time:
                 idx += 1
             if points[idx][0] <= col_time:
-                col_soc[col] = points[idx][1]
-        return col_soc
+                col_values[col] = points[idx][1]
+        return col_values
+
+    def _hour_gridline_columns(self, window: float, width: int):
+        """Yield interior column indices for each hour increment back from now."""
+        grid = config.HISTORY_GRID_HOURS * 3600
+        if grid <= 0 or width <= 1:
+            return
+        k = 1
+        while k * grid < window:
+            frac = 1.0 - (k * grid) / window
+            col = int(round(frac * (width - 1)))
+            k += 1
+            if 0 < col < width:
+                yield col
+
+    # --- house battery SOC history chart ------------------------------------
 
     def _draw_house_battery_background(
         self,
-        history: Sequence[_SocPoint],
+        history: Sequence[_HistoryPoint],
         now: float,
     ) -> None:
         zone = layout.HOUSE_BATTERY
@@ -121,16 +145,22 @@ class MetricsDashboard(EpaperDisplay):
 
         self._draw.rectangle((zone.x, zone.y, zone.x1 - 1, zone.y1 - 1), fill=layout.WHITE)
 
-        col_soc = self._column_soc(history, now, window, zone.width)
+        col_soc = self._column_series(history, now, window, zone.width, lambda p: p.soc)
         for col, soc in enumerate(col_soc):
             if soc is None:
                 continue
             x = zone.x + col
-            fill_top = self._soc_to_y(soc)
+            fill_top = self._value_to_y(zone, soc, 100.0)
             if fill_top <= zone.y1 - 1:
                 self._draw.line((x, fill_top, x, zone.y1 - 1), fill=layout.BLACK)
 
-        self._draw_house_gridlines(zone, now, window, col_soc)
+        # Hour gridlines, black, only in the white area above the SOC fill.
+        for col in self._hour_gridline_columns(window, zone.width):
+            x = zone.x + col
+            soc = col_soc[col]
+            fill_top = self._value_to_y(zone, soc, 100.0) if soc is not None else zone.y1
+            if fill_top - 1 >= zone.y:
+                self._draw.line((x, zone.y, x, fill_top - 1), fill=layout.BLACK)
 
         # Border marks the full 100% frame.
         self._draw.rectangle(
@@ -139,29 +169,49 @@ class MetricsDashboard(EpaperDisplay):
             width=layout.HOUSE_BATTERY_BORDER_WIDTH,
         )
 
-    def _draw_house_gridlines(
+    # --- solar power history line chart -------------------------------------
+
+    def _draw_solar_chart(
         self,
-        zone: layout.Zone,
+        history: Sequence[_HistoryPoint],
         now: float,
-        window: float,
-        col_soc: list[float | None],
     ) -> None:
-        grid = config.HISTORY_GRID_HOURS * 3600
-        if grid <= 0 or zone.width <= 1:
-            return
-        k = 1
-        while k * grid < window:
-            frac = 1.0 - (k * grid) / window
-            col = int(round(frac * (zone.width - 1)))
-            k += 1
-            if col <= 0 or col >= zone.width:
-                continue
+        zone = layout.SOLAR
+        window = config.HISTORY_WINDOW_HOURS * 3600
+
+        # Stroke-only line of solar power (0..SOLAR_MAX_W), latest at the right edge.
+        col_w = self._column_series(history, now, window, zone.width, lambda p: p.solar)
+        vmax = float(config.SOLAR_MAX_W)
+
+        # Hour gridlines, black, only above the line (mirrors the battery panel).
+        for col in self._hour_gridline_columns(window, zone.width):
             x = zone.x + col
-            soc = col_soc[col]
-            fill_top = self._soc_to_y(soc) if soc is not None else zone.y1
-            # Black gridline in the white area only; it stops where the SOC fill begins.
-            if fill_top - 1 >= zone.y:
-                self._draw.line((x, zone.y, x, fill_top - 1), fill=layout.BLACK)
+            value = col_w[col]
+            line_y = self._value_to_y(zone, value, vmax) if value is not None else zone.y1
+            if line_y - 1 >= zone.y:
+                self._draw.line((x, zone.y, x, line_y - 1), fill=layout.BLACK)
+
+        run: list[tuple[int, int]] = []
+        for col, value in enumerate(col_w):
+            if value is None:
+                self._flush_line(run)
+                run = []
+                continue
+            run.append((zone.x + col, self._value_to_y(zone, value, vmax)))
+        self._flush_line(run)
+
+        # Redraw border on top so the line/gridlines stay inside a clean frame.
+        self._draw.rectangle(
+            (zone.x, zone.y, zone.x1 - 1, zone.y1 - 1),
+            outline=layout.BLACK,
+            width=layout.STYLE_SOLAR.border_width,
+        )
+
+    def _flush_line(self, run: list[tuple[int, int]]) -> None:
+        if len(run) >= 2:
+            self._draw.line(run, fill=layout.BLACK, width=layout.SOLAR_LINE_WIDTH)
+        elif len(run) == 1:
+            self._draw.point(run[0], fill=layout.BLACK)
 
     # --- flow arrows --------------------------------------------------------
 
@@ -236,25 +286,30 @@ class MetricsDashboard(EpaperDisplay):
     # --- panels -------------------------------------------------------------
 
     def _draw_solar(self, metrics: VanMetrics) -> None:
+        # Black text with a white halo stays readable over the line chart + gridlines.
         style = layout.STYLE_SOLAR
-        self._text(layout.LABEL_SOLAR, layout.SOLAR_LABEL, self._font_label, style)
+        sw = layout.SOLAR_TEXT_STROKE_WIDTH
+        self._text(layout.LABEL_SOLAR, layout.SOLAR_LABEL, self._font_label, style, stroke_width=sw)
         self._text(
             fmt(metrics.victron.solar_power_w, suffix=" W"),
             layout.SOLAR_VALUE,
             self._font_hero,
             style,
+            stroke_width=sw,
         )
         self._text(
             fmt_yield_today(metrics.victron.yield_today_wh),
             layout.SOLAR_YIELD_TODAY,
             self._font_body,
             style,
+            stroke_width=sw,
         )
         self._draw_caption_right(
             f"{config.SOLAR_MAX_W} W max",
             layout.SOLAR,
             layout.SOLAR_MAX_CAPTION_Y,
             style,
+            stroke_width=sw,
         )
         if metrics.victron.error:
             self._text(
@@ -262,6 +317,7 @@ class MetricsDashboard(EpaperDisplay):
                 (layout.SOLAR.x + 8, layout.SOLAR.y1 - 18),
                 self._font_label,
                 style,
+                stroke_width=sw,
             )
 
     def _draw_house_battery(self, metrics: VanMetrics) -> None:
@@ -319,7 +375,7 @@ class MetricsDashboard(EpaperDisplay):
         self,
         metrics: VanMetrics,
         *,
-        history: Sequence[_SocPoint] | None = None,
+        history: Sequence[_HistoryPoint] | None = None,
         now: float | None = None,
         partial: bool = False,
     ) -> None:
