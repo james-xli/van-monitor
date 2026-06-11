@@ -157,6 +157,28 @@ class MetricsDashboard(EpaperDisplay):
             if 0 < col < width:
                 yield col
 
+    def _draw_dotted_horizontal_above_fill(
+        self,
+        y: int,
+        chart: layout.Zone,
+        col_fill_top: Sequence[int],
+    ) -> None:
+        """Black dotted horizontal gridline only where y sits above the SOC fill."""
+        period = layout.GRID_DASH_LEN + layout.GRID_DASH_GAP
+        run_start: int | None = None
+        for col in range(chart.width):
+            x = chart.x + col
+            above = chart.y <= y < col_fill_top[col]
+            on_dash = (col % period) < layout.GRID_DASH_LEN
+            if above and on_dash:
+                if run_start is None:
+                    run_start = x
+            elif run_start is not None:
+                self._draw.line((run_start, y, x - 1, y), fill=layout.BLACK)
+                run_start = None
+        if run_start is not None:
+            self._draw.line((run_start, y, chart.x1 - 1, y), fill=layout.BLACK)
+
     # --- house battery SOC history chart ------------------------------------
 
     def _draw_house_battery_background(
@@ -181,12 +203,24 @@ class MetricsDashboard(EpaperDisplay):
             if fill_top <= chart.y1 - 1:
                 self._draw.line((x, fill_top, x, chart.y1 - 1), fill=layout.BLACK)
 
-        # Vertical hour gridlines, black, only in the white area above the fill.
+        col_fill_top = [
+            self._value_to_y(chart, soc, 100.0) if soc is not None else chart.y1
+            for soc in col_soc
+        ]
+
+        # Solid black hour gridlines, only in the white area above the fill.
         for col in self._hour_gridline_columns(window, chart.width):
-            soc = col_soc[col]
-            fill_top = self._value_to_y(chart, soc, 100.0) if soc is not None else chart.y1
+            fill_top = col_fill_top[col]
             if fill_top - 1 >= chart.y:
-                self._draw.line((chart.x + col, chart.y, chart.x + col, fill_top - 1), fill=layout.BLACK)
+                self._draw.line(
+                    (chart.x + col, chart.y, chart.x + col, fill_top - 1),
+                    fill=layout.BLACK,
+                )
+
+        # Dotted black SOC gridlines every 10%, clipped above the fill.
+        for pct in range(layout.SOC_GRID_STEP, 100, layout.SOC_GRID_STEP):
+            y = self._value_to_y(chart, float(pct), 100.0)
+            self._draw_dotted_horizontal_above_fill(y, chart, col_fill_top)
 
         # Separated stats strip below the divider: always solid black for white text.
         self._draw.rectangle(
@@ -219,14 +253,23 @@ class MetricsDashboard(EpaperDisplay):
         col_w = self._column_series(history, now, window, chart.width, lambda p: p.solar)
         vmax = float(config.SOLAR_MAX_W)
 
+        col_line_y = [
+            self._value_to_y(chart, value, vmax) if value is not None else chart.y1
+            for value in col_w
+        ]
+
         # Hour gridlines, black, only in the area above the line (mirrors the battery
         # panel). They run from the panel's top edge down to the line, not just from
         # the chart's inset top, so they reach the frame.
         for col in self._hour_gridline_columns(window, chart.width):
-            value = col_w[col]
-            line_y = self._value_to_y(chart, value, vmax) if value is not None else chart.y1
+            line_y = col_line_y[col]
             if line_y - 1 >= panel.y:
                 self._draw.line((chart.x + col, panel.y, chart.x + col, line_y - 1), fill=layout.BLACK)
+
+        # Dotted horizontal power gridlines every 50 W, clipped above the line.
+        for watts in range(layout.SOLAR_GRID_STEP, int(vmax), layout.SOLAR_GRID_STEP):
+            y = self._value_to_y(chart, float(watts), vmax)
+            self._draw_dotted_horizontal_above_fill(y, chart, col_line_y)
 
         # Clamp the top so the peak stays inside the frame; let 0 W sit exactly on
         # the divider (chart.y1 == SOLAR_DIVIDER_Y), where the divider covers it.

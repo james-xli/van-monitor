@@ -98,6 +98,16 @@ SOLAR_DIVIDER_WIDTH = 2
 # Corner radius (px) for the solar and battery panel frames.
 PANEL_CORNER_RADIUS = 10
 
+# Dotted horizontal grid: dash/gap in pixels (shared by battery + solar charts).
+GRID_DASH_LEN = 1
+GRID_DASH_GAP = 3
+
+# House battery chart: horizontal lines every N% SOC.
+SOC_GRID_STEP = 10
+
+# Solar chart: horizontal lines every N watts (0..SOLAR_MAX_W).
+SOLAR_GRID_STEP = 100
+
 
 def _abs(frame: Zone, left: int, top: int) -> tuple[int, int]:
     """Convert Figma position inside a panel to absolute screen coordinates."""
