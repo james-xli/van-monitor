@@ -213,11 +213,11 @@ class MetricsDashboard(EpaperDisplay):
             if line_y - 1 >= panel.y:
                 self._draw.line((chart.x + col, panel.y, chart.x + col, line_y - 1), fill=layout.BLACK)
 
-        # Keep the full stroke width inside the chart (0 W would otherwise spill
-        # past the divider).
+        # Clamp the top so the peak stays inside the frame; let 0 W sit exactly on
+        # the divider (chart.y1 == SOLAR_DIVIDER_Y), where the divider covers it.
         half = layout.SOLAR_LINE_WIDTH // 2
         y_min = chart.y + half
-        y_max = chart.y1 - 1 - half
+        y_max = chart.y1
         run: list[tuple[int, int]] = []
         for col, value in enumerate(col_w):
             if value is None:
