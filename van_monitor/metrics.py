@@ -77,11 +77,11 @@ def fmt_anker_net(power_in_w: float | None, power_out_w: float | None) -> str:
     return fmt_signed_watts(power_in_w - power_out_w)
 
 
-def fmt_updated_at(when: datetime | None) -> str:
-    """Format timestamp like Figma node 25:32: '6/10 16:30'."""
+def fmt_date_lines(when: datetime | None) -> tuple[str, str]:
+    """Two-line date like Figma node 40:97: ('Thursday', 'June 11')."""
     if when is None:
-        return ""
-    return f"{when.month}/{when.day} {when:%H:%M}"
+        return ("", "")
+    return (when.strftime("%A"), f"{when:%B} {when.day}")
 
 
 def print_metrics(metrics: VanMetrics) -> None:

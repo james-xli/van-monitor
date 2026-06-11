@@ -174,15 +174,16 @@ Terminal-only mode (no e-paper):
   independent of the faster display poll — 5s resolution can't be shown on a
   chart with ~98s per pixel and only wears the SD card,
 - persists across reboots (the service reloads it on start),
-- is pruned to the last `HISTORY_RETENTION_HOURS` (default 24h), while the charts
-  display the shorter `HISTORY_WINDOW_HOURS` (default 12h),
+- is pruned to the last `HISTORY_RETENTION_HOURS` (default 24h),
 - is excluded from `deploy.sh` (so deploys never overwrite Pi data) and from git.
 
-Both panels show a 12h chart with the latest reading at the right edge and thin
-vertical lines marking each hour counting back from now:
+Each panel shows the latest reading at the right edge with thin vertical lines
+marking each hour counting back from now:
 
-- **House battery** — black area fill; height equals SOC% at that time.
-- **Solar** — a stroke-only line (no fill); height maps 0..`SOLAR_MAX_W`.
+- **House battery** — `HOUSE_HISTORY_HOURS` (default 24h) of black area fill;
+  height equals SOC% at that time. Stats sit in a solid-black strip below.
+- **Solar** — `SOLAR_HISTORY_HOURS` (default 12h) as a stroke-only line (no
+  fill); height maps 0..`SOLAR_MAX_W`.
 
 ## Configuration
 
@@ -196,7 +197,8 @@ Edit `config.py`:
 | `UNAVAILABLE_LABEL` | Shown when a device is disconnected (default: `NA`) |
 | `SOLAR_MAX_W` | Solar panel caption, e.g. `220 W max` |
 | `HOUSE_BATTERY_CAPACITY_KWH` | House battery caption, e.g. `2 kWh capacity` |
-| `HISTORY_WINDOW_HOURS` | Hours of SOC/solar history shown on the charts (default 12) |
+| `SOLAR_HISTORY_HOURS` | Hours of solar history shown on the solar chart (default 12) |
+| `HOUSE_HISTORY_HOURS` | Hours of SOC history shown on the house battery chart (default 24) |
 | `HISTORY_RETENTION_HOURS` | Hours of history kept in memory/on disk (default 24) |
 | `HISTORY_SAMPLE_INTERVAL_SECONDS` | Min seconds between logged points (default 60; decoupled from poll) |
 | `HISTORY_GRID_HOURS` | Spacing of the battery chart's hour gridlines (default 1) |

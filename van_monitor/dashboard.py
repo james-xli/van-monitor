@@ -23,8 +23,8 @@ from van_monitor.fonts import load_bold_font, load_caption_font
 from van_monitor.metrics import (
     VanMetrics,
     fmt,
+    fmt_date_lines,
     fmt_signed_watts,
-    fmt_updated_at,
     fmt_yield_today,
 )
 
@@ -36,7 +36,7 @@ class _HistoryPoint(Protocol):
 
 
 class MetricsDashboard(EpaperDisplay):
-    """Draw P0 metrics in fixed zones (Figma Main screen v5 w/o Anker)."""
+    """Draw P0 metrics in fixed zones (Figma Main screen v7 w/o Anker)."""
 
     def __init__(self):
         super().__init__()
@@ -46,6 +46,7 @@ class MetricsDashboard(EpaperDisplay):
         self._font_solar_hero = load_bold_font(layout.FONT_SOLAR_HERO)
         self._font_solar_body = load_bold_font(layout.FONT_SOLAR_BODY)
         self._font_caption = load_caption_font(layout.FONT_CAPTION)
+        self._font_date = load_bold_font(layout.FONT_DATE)
 
     def render(
         self,
@@ -65,7 +66,7 @@ class MetricsDashboard(EpaperDisplay):
         self._draw_flow_arrows()
         self._draw_solar(metrics)
         self._draw_house_battery(metrics)
-        self._draw_updated_at(metrics)
+        self._draw_date(metrics)
 
     def _zone_bbox(self, zone: layout.Zone) -> tuple[int, int, int, int]:
         return (zone.x, zone.y, zone.x1 - 1, zone.y1 - 1)
@@ -163,30 +164,44 @@ class MetricsDashboard(EpaperDisplay):
         history: Sequence[_HistoryPoint],
         now: float,
     ) -> None:
-        zone = layout.HOUSE_BATTERY
-        window = config.HISTORY_WINDOW_HOURS * 3600
+        panel = layout.HOUSE_BATTERY
+        chart = layout.HOUSE_CHART
+        window = config.HOUSE_HISTORY_HOURS * 3600
 
-        self._draw.rectangle((zone.x, zone.y, zone.x1 - 1, zone.y1 - 1), fill=layout.WHITE)
+        self._draw.rectangle((panel.x, panel.y, panel.x1 - 1, panel.y1 - 1), fill=layout.WHITE)
 
-        col_soc = self._column_series(history, now, window, zone.width, lambda p: p.soc)
+        # SOC area chart in the top region: black fill from the curve down to the
+        # divider (the chart's baseline); white above.
+        col_soc = self._column_series(history, now, window, chart.width, lambda p: p.soc)
         for col, soc in enumerate(col_soc):
             if soc is None:
                 continue
-            x = zone.x + col
-            fill_top = self._value_to_y(zone, soc, 100.0)
-            if fill_top <= zone.y1 - 1:
-                self._draw.line((x, fill_top, x, zone.y1 - 1), fill=layout.BLACK)
+            x = chart.x + col
+            fill_top = self._value_to_y(chart, soc, 100.0)
+            if fill_top <= chart.y1 - 1:
+                self._draw.line((x, fill_top, x, chart.y1 - 1), fill=layout.BLACK)
 
         # Vertical hour gridlines, black, only in the white area above the fill.
-        for col in self._hour_gridline_columns(window, zone.width):
+        for col in self._hour_gridline_columns(window, chart.width):
             soc = col_soc[col]
-            fill_top = self._value_to_y(zone, soc, 100.0) if soc is not None else zone.y1
-            if fill_top - 1 >= zone.y:
-                self._draw.line((zone.x + col, zone.y, zone.x + col, fill_top - 1), fill=layout.BLACK)
+            fill_top = self._value_to_y(chart, soc, 100.0) if soc is not None else chart.y1
+            if fill_top - 1 >= chart.y:
+                self._draw.line((chart.x + col, chart.y, chart.x + col, fill_top - 1), fill=layout.BLACK)
+
+        # Separated stats strip below the divider: always solid black for white text.
+        self._draw.rectangle(
+            (panel.x, layout.HOUSE_DIVIDER_Y, panel.x1 - 1, panel.y1 - 1), fill=layout.BLACK
+        )
+        # White divider so it reads against the black stats strip.
+        self._draw.line(
+            (panel.x, layout.HOUSE_DIVIDER_Y, panel.x1-1, layout.HOUSE_DIVIDER_Y),
+            fill=layout.WHITE,
+            width=layout.SOLAR_DIVIDER_WIDTH,
+        )
 
         # Clip the fill out of the rounded corners, then stroke the rounded frame.
-        self._clip_corners(zone)
-        self._draw_panel_border(zone, layout.STYLE_BATTERY)
+        self._clip_corners(panel)
+        self._draw_panel_border(panel, layout.STYLE_BATTERY)
 
     # --- solar power history line chart -------------------------------------
 
@@ -195,10 +210,10 @@ class MetricsDashboard(EpaperDisplay):
         history: Sequence[_HistoryPoint],
         now: float,
     ) -> None:
-        # v5: the chart occupies the top region only; text sits below the divider.
+        # The chart occupies the top region only; text sits below the divider.
         chart = layout.SOLAR_CHART
         panel = layout.SOLAR
-        window = config.HISTORY_WINDOW_HOURS * 3600
+        window = config.SOLAR_HISTORY_HOURS * 3600
 
         # Stroke-only line of solar power (0..SOLAR_MAX_W), latest at the right edge.
         col_w = self._column_series(history, now, window, chart.width, lambda p: p.solar)
@@ -316,6 +331,21 @@ class MetricsDashboard(EpaperDisplay):
         x = zone.x1 - width - layout.CAPTION_RIGHT_MARGIN
         self._text(text, (x, y), font, style, stroke_width=stroke_width)
 
+    def _text_right(
+        self,
+        text: str,
+        right_x: int,
+        y: int,
+        font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+        style: layout.PanelStyle,
+        *,
+        stroke_width: int | None = None,
+    ) -> None:
+        """Draw text right-aligned to right_x."""
+        bbox = self._draw.textbbox((0, 0), text, font=font)
+        width = bbox[2] - bbox[0]
+        self._text(text, (right_x - width, y), font, style, stroke_width=stroke_width)
+
     # --- panels -------------------------------------------------------------
 
     def _draw_solar(self, metrics: VanMetrics) -> None:
@@ -349,7 +379,7 @@ class MetricsDashboard(EpaperDisplay):
             )
 
     def _draw_house_battery(self, metrics: VanMetrics) -> None:
-        # White text with a black halo stays readable over the variable SOC chart.
+        # Stats live in the solid-black strip below the divider; white text + halo.
         style = layout.STYLE_BATTERY
         sw = layout.HOUSE_TEXT_STROKE_WIDTH
         self._text(layout.LABEL_HOUSE, layout.HOUSE_LABEL, self._font_label, style, stroke_width=sw)
@@ -360,16 +390,19 @@ class MetricsDashboard(EpaperDisplay):
             style,
             stroke_width=sw,
         )
-        self._text(
+        # Power and voltage are right-aligned (v7).
+        self._text_right(
             fmt_signed_watts(metrics.litime.power_w),
-            layout.HOUSE_POWER,
+            layout.HOUSE_STATS_RIGHT,
+            layout.HOUSE_POWER_Y,
             self._font_body,
             style,
             stroke_width=sw,
         )
-        self._text(
+        self._text_right(
             fmt(metrics.litime.voltage_v, decimals=1, suffix=" V"),
-            layout.HOUSE_VOLTAGE,
+            layout.HOUSE_STATS_RIGHT,
+            layout.HOUSE_VOLTAGE_Y,
             self._font_body,
             style,
             stroke_width=sw,
@@ -384,18 +417,20 @@ class MetricsDashboard(EpaperDisplay):
         if metrics.litime.error:
             self._text(
                 metrics.litime.error[:28],
-                (layout.HOUSE_BATTERY.x + 8, layout.HOUSE_BATTERY.y + 8),
+                (layout.HOUSE_BATTERY.x + 16, layout.HOUSE_DIVIDER_Y + 4),
                 self._font_label,
                 style,
                 stroke_width=sw,
             )
 
-    def _draw_updated_at(self, metrics: VanMetrics) -> None:
-        stamp = fmt_updated_at(metrics.updated_at)
-        if not stamp:
+    def _draw_date(self, metrics: VanMetrics) -> None:
+        line1, line2 = fmt_date_lines(metrics.updated_at)
+        if not line1 and not line2:
             return
         style = layout.STYLE_SOLAR
-        self._text(stamp, layout.UPDATED_AT, self._font_label, style)
+        x, y = layout.DATE_ORIGIN
+        self._text(line1, (x, y), self._font_date, style)
+        self._text(line2, (x, y + layout.DATE_LINE_HEIGHT), self._font_date, style)
 
     # --- public API ---------------------------------------------------------
 

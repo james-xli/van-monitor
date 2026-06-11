@@ -57,9 +57,11 @@ def sample_history(now: float, scenario: str = "low") -> list[HistoryPoint]:
     scenario="high": SOC stays high all window (~62% -> ~96%), so most of the panel
                      is filled and the in-fill white gridlines are visible.
     """
-    window = config.HISTORY_WINDOW_HOURS * 3600
+    # Span the full retention window so the 24h house chart and 12h solar chart
+    # both have data across their widths.
+    window = config.HISTORY_RETENTION_HOURS * 3600
     points: list[HistoryPoint] = []
-    steps = 144  # every 5 minutes
+    steps = 288  # every 5 minutes over 24h
     floor_frac = 0.4  # stay low through the first ~40% of the window
     for i in range(steps + 1):
         frac = i / steps
@@ -112,6 +114,7 @@ def _render_png(path: str, metrics: VanMetrics, history: list[HistoryPoint], now
             self._font_solar_hero = load_bold_font(layout.FONT_SOLAR_HERO)
             self._font_solar_body = load_bold_font(layout.FONT_SOLAR_BODY)
             self._font_caption = load_caption_font(layout.FONT_CAPTION)
+            self._font_date = load_bold_font(layout.FONT_DATE)
 
     dash = _PreviewDashboard()
     dash.render(metrics, history=history, now=now)

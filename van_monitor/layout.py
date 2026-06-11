@@ -22,7 +22,8 @@ FONT_HERO = 54
 FONT_SOLAR_HERO = 40
 FONT_SOLAR_BODY = 20
 FONT_CAPTION = 14
-FONT_TIMESTAMP = 14
+# v7 shows a large two-line date (node 40:97) instead of a small timestamp.
+FONT_DATE = 36
 
 CAPTION_RIGHT_MARGIN = 14
 
@@ -103,31 +104,38 @@ def _abs(frame: Zone, left: int, top: int) -> tuple[int, int]:
     return (frame.x + left, frame.y + top)
 
 
-# Panels — node 38:36 Solar, node 38:44 House Battery
-SOLAR = Zone(x=16, y=124, width=300, height=213)
-HOUSE_BATTERY = Zone(x=344, y=69, width=440, height=341)
+# Panels — node 40:80 Solar (half width), node 40:89 House Battery
+SOLAR = Zone(x=20, y=150, width=240, height=200)
+HOUSE_BATTERY = Zone(x=300, y=86, width=480, height=340)
 
-# Solar chart area (node 38:37): the top region of the panel, above the divider
-# line (node 38:57). The text lives below this, so the chart no longer overlaps it.
-SOLAR_CHART = Zone(x=SOLAR.x, y=SOLAR.y + 8, width=300, height=108)
-SOLAR_DIVIDER_Y = SOLAR.y + 116
+# Solar chart area (node 40:81): top region above the divider (node 40:88).
+SOLAR_CHART = Zone(x=SOLAR.x, y=SOLAR.y + 8, width=SOLAR.width, height=97)
+SOLAR_DIVIDER_Y = SOLAR.y + 105
 
-# Solar text below the divider (nodes 38:41–38:43, caption 38:38)
-SOLAR_LABEL = _abs(SOLAR, 11, 125)
-SOLAR_VALUE = _abs(SOLAR, 9, 138)
-SOLAR_YIELD_TODAY = _abs(SOLAR, 9, 182)
-SOLAR_MAX_CAPTION_Y = _abs(SOLAR, 0, 187)[1]
+# Solar text below the divider (nodes 40:85–40:87, caption 40:82 right-aligned)
+SOLAR_LABEL = _abs(SOLAR, 12, 113)
+SOLAR_VALUE = _abs(SOLAR, 10, 127)
+SOLAR_YIELD_TODAY = _abs(SOLAR, 10, 171)
+SOLAR_MAX_CAPTION_Y = _abs(SOLAR, 0, 113)[1]
 
-# House battery text (nodes 21:51–21:53, caption 21:49)
-HOUSE_LABEL = _abs(HOUSE_BATTERY, 16, 186)
-HOUSE_SOC = _abs(HOUSE_BATTERY, 15, 203)
-HOUSE_POWER = _abs(HOUSE_BATTERY, 16, 268)
-HOUSE_VOLTAGE = _abs(HOUSE_BATTERY, 16, 292)
-HOUSE_CAPACITY_CAPTION_Y = _abs(HOUSE_BATTERY, 0, 310)[1]
+# House battery chart area (node 40:90) above its stats divider (node 40:110).
+# The stats strip below the divider is filled solid black with white text.
+HOUSE_CHART = Zone(x=HOUSE_BATTERY.x, y=HOUSE_BATTERY.y, width=HOUSE_BATTERY.width, height=245)
+HOUSE_DIVIDER_Y = HOUSE_BATTERY.y + 245
 
-# Last-updated stamp (node 25:32)
-UPDATED_AT = (14, 451)
+# House battery stats (nodes 40:93–40:95, caption 40:91). The SOC % and label are
+# left-aligned; power/voltage and the capacity caption are right-aligned.
+HOUSE_LABEL = _abs(HOUSE_BATTERY, 16, 255)
+HOUSE_SOC = _abs(HOUSE_BATTERY, 15, 272)
+HOUSE_STATS_RIGHT = HOUSE_BATTERY.x1 - 15
+HOUSE_POWER_Y = HOUSE_BATTERY.y + 279
+HOUSE_VOLTAGE_Y = HOUSE_BATTERY.y + 303
+HOUSE_CAPACITY_CAPTION_Y = _abs(HOUSE_BATTERY, 0, 255)[1]
 
-# Flow arrow solar → house (node 21:55)
-ARROW_SOLAR_TO_HOUSE = ((321, 240), (339, 240))
+# Large two-line date, top-left (node 40:97). Time is no longer shown.
+DATE_ORIGIN = (20, 20)
+DATE_LINE_HEIGHT = 36
+
+# Flow arrow solar → house (node 40:96)
+ARROW_SOLAR_TO_HOUSE = ((271, 256), (289, 256))
 ARROW_HEAD_SIZE = 10
