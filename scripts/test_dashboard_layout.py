@@ -109,6 +109,8 @@ def _render_png(path: str, metrics: VanMetrics, history: list[HistoryPoint], now
             self._font_label = load_bold_font(layout.FONT_LABEL)
             self._font_body = load_bold_font(layout.FONT_BODY)
             self._font_hero = load_bold_font(layout.FONT_HERO)
+            self._font_solar_hero = load_bold_font(layout.FONT_SOLAR_HERO)
+            self._font_solar_body = load_bold_font(layout.FONT_SOLAR_BODY)
             self._font_caption = load_caption_font(layout.FONT_CAPTION)
 
     dash = _PreviewDashboard()

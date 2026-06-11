@@ -1,7 +1,7 @@
 """
 Render P0 van metrics on the e-paper display.
 
-Layout matches Figma "Main screen v4 w/o Anker" (node 21:30), strict B/W, no chart fills.
+Layout matches Figma "Main screen v5 w/o Anker" (node 38:35), strict B/W, no chart fills.
 
 The house battery panel's black background is a 12h SOC area chart: the latest SOC
 sits at the right edge, fill height at each column equals SOC% at that time, and thin
@@ -36,13 +36,15 @@ class _HistoryPoint(Protocol):
 
 
 class MetricsDashboard(EpaperDisplay):
-    """Draw P0 metrics in fixed zones (Figma Main screen v4 w/o Anker)."""
+    """Draw P0 metrics in fixed zones (Figma Main screen v5 w/o Anker)."""
 
     def __init__(self):
         super().__init__()
         self._font_label = load_bold_font(layout.FONT_LABEL)
         self._font_body = load_bold_font(layout.FONT_BODY)
         self._font_hero = load_bold_font(layout.FONT_HERO)
+        self._font_solar_hero = load_bold_font(layout.FONT_SOLAR_HERO)
+        self._font_solar_body = load_bold_font(layout.FONT_SOLAR_BODY)
         self._font_caption = load_caption_font(layout.FONT_CAPTION)
 
     def render(
@@ -193,39 +195,50 @@ class MetricsDashboard(EpaperDisplay):
         history: Sequence[_HistoryPoint],
         now: float,
     ) -> None:
-        zone = layout.SOLAR
+        # v5: the chart occupies the top region only; text sits below the divider.
+        chart = layout.SOLAR_CHART
+        panel = layout.SOLAR
         window = config.HISTORY_WINDOW_HOURS * 3600
 
         # Stroke-only line of solar power (0..SOLAR_MAX_W), latest at the right edge.
-        col_w = self._column_series(history, now, window, zone.width, lambda p: p.solar)
+        col_w = self._column_series(history, now, window, chart.width, lambda p: p.solar)
         vmax = float(config.SOLAR_MAX_W)
 
-        # Hour gridlines, black, only in the area above the line (mirrors the battery panel).
-        for col in self._hour_gridline_columns(window, zone.width):
+        # Hour gridlines, black, only in the area above the line (mirrors the battery
+        # panel). They run from the panel's top edge down to the line, not just from
+        # the chart's inset top, so they reach the frame.
+        for col in self._hour_gridline_columns(window, chart.width):
             value = col_w[col]
-            line_y = self._value_to_y(zone, value, vmax) if value is not None else zone.y1
-            if line_y - 1 >= zone.y:
-                self._draw.line((zone.x + col, zone.y, zone.x + col, line_y - 1), fill=layout.BLACK)
+            line_y = self._value_to_y(chart, value, vmax) if value is not None else chart.y1
+            if line_y - 1 >= panel.y:
+                self._draw.line((chart.x + col, panel.y, chart.x + col, line_y - 1), fill=layout.BLACK)
 
-        # Keep the full stroke width inside the frame (0 W would otherwise spill
-        # below the bottom border).
+        # Keep the full stroke width inside the chart (0 W would otherwise spill
+        # past the divider).
         half = layout.SOLAR_LINE_WIDTH // 2
-        y_min = zone.y + half
-        y_max = zone.y1 - 1 - half
+        y_min = chart.y + half
+        y_max = chart.y1 - 1 - half
         run: list[tuple[int, int]] = []
         for col, value in enumerate(col_w):
             if value is None:
                 self._flush_line(run)
                 run = []
                 continue
-            y = self._value_to_y(zone, value, vmax)
+            y = self._value_to_y(chart, value, vmax)
             y = max(y_min, min(y_max, y))
-            run.append((zone.x + col, y))
+            run.append((chart.x + col, y))
         self._flush_line(run)
 
+        # Divider line between the chart and the text below it (node 38:57).
+        self._draw.line(
+            (panel.x, layout.SOLAR_DIVIDER_Y, panel.x1 - 1, layout.SOLAR_DIVIDER_Y),
+            fill=layout.BLACK,
+            width=layout.SOLAR_DIVIDER_WIDTH,
+        )
+
         # Clip the line/gridlines out of the rounded corners, then stroke the frame.
-        self._clip_corners(zone)
-        self._draw_panel_border(zone, layout.STYLE_SOLAR)
+        self._clip_corners(panel)
+        self._draw_panel_border(panel, layout.STYLE_SOLAR)
 
     def _flush_line(self, run: list[tuple[int, int]]) -> None:
         if len(run) >= 2:
@@ -306,30 +319,26 @@ class MetricsDashboard(EpaperDisplay):
     # --- panels -------------------------------------------------------------
 
     def _draw_solar(self, metrics: VanMetrics) -> None:
-        # Black text with a white halo stays readable over the line chart + gridlines.
+        # v5: text sits below the chart on a clean white area, so no halo is needed.
         style = layout.STYLE_SOLAR
-        sw = layout.SOLAR_TEXT_STROKE_WIDTH
-        self._text(layout.LABEL_SOLAR, layout.SOLAR_LABEL, self._font_label, style, stroke_width=sw)
+        self._text(layout.LABEL_SOLAR, layout.SOLAR_LABEL, self._font_label, style)
         self._text(
             fmt(metrics.victron.solar_power_w, suffix=" W"),
             layout.SOLAR_VALUE,
-            self._font_hero,
+            self._font_solar_hero,
             style,
-            stroke_width=sw,
         )
         self._text(
             fmt_yield_today(metrics.victron.yield_today_wh),
             layout.SOLAR_YIELD_TODAY,
-            self._font_body,
+            self._font_solar_body,
             style,
-            stroke_width=sw,
         )
         self._draw_caption_right(
             f"{config.SOLAR_MAX_W} W max",
             layout.SOLAR,
             layout.SOLAR_MAX_CAPTION_Y,
             style,
-            stroke_width=sw,
         )
         if metrics.victron.error:
             self._text(
@@ -337,7 +346,6 @@ class MetricsDashboard(EpaperDisplay):
                 (layout.SOLAR.x + 8, layout.SOLAR.y1 - 18),
                 self._font_label,
                 style,
-                stroke_width=sw,
             )
 
     def _draw_house_battery(self, metrics: VanMetrics) -> None:
