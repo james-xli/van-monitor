@@ -6,8 +6,9 @@ Test each device individually first:
     scripts/test_litime.py
     scripts/test_victron.py
 
-Anker is not polled here (SolixBLE lacks C1000 Gen 2 telemetry). Use
-scripts/test_anker.py to experiment with that collector in isolation.
+Anker is not polled here yet. The Gen 2 driver works but needs a one-time
+button-press pairing and is not on the display layout. Validate it with
+scripts/test_anker.py, then wire it into collectors/__init__.py.
 """
 
 from __future__ import annotations
@@ -85,7 +86,7 @@ def main() -> int:
     parser.add_argument(
         "--debug-ble",
         action="store_true",
-        help="Show bleak/SolixBLE debug (very noisy; use with -v)",
+        help="Show bleak debug (very noisy; use with -v)",
     )
     args = parser.parse_args()
 

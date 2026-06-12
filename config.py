@@ -68,7 +68,19 @@ VICTRON_ADDRESS = "F6:76:F4:A0:59:A7"
 VICTRON_KEY = "5396e672b53fa0194d9b5730508bb1aa"  # 32-character hex advertisement key
 
 # Anker Solix C1000 Gen 2 (used by scripts/test_anker.py only — not polled by run_monitor).
+# The Gen 2 needs a one-time physical button press to authorize this Pi; after
+# that, the client id below is reused so no further button press is needed.
 ANKER_ADDRESS = "7C:E9:13:31:84:52"
+
+# Where the Anker pairing client id is stored. Delete this file to force a fresh
+# pairing (you will need to press the station's button again).
+ANKER_CLIENT_ID_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "data", "anker_client_id.txt"
+)
+
+# How long to keep waiting (seconds) for the one-time physical button press
+# during first-time Anker pairing.
+ANKER_BUTTON_WAIT_SECONDS = 180
 
 # Seconds to wait when scanning before connect (Pi Zero W: allow 20–30).
 BLE_TIMEOUT_SECONDS = 25

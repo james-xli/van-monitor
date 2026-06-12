@@ -15,9 +15,6 @@ if str(ROOT) not in sys.path:
 _BLE_QUIET_LOGGERS = (
     "bleak",
     "dbus_fast",
-    "SolixBLE",
-    "SolixBLE.device",
-    "SolixBLE.utilities",
 )
 
 

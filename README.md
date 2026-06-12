@@ -99,25 +99,75 @@ Set `VICTRON_ADDRESS` and `VICTRON_KEY` in `config.py`.
 **Tip:** Close Victron Connect on your phone while testing — it can interfere
 with advertisements.
 
-### 4. Anker Solix C1000 Gen 2 (optional, not in main loop)
+### 4. Anker Solix C1000 Gen 2 (custom driver, not yet in main loop)
 
-The Anker collector and `scripts/test_anker.py` are kept for future use, but
-**`run_monitor.py` does not poll Anker**. [SolixBLE](https://github.com/flip-dots/SolixBLE)
-connects and negotiates with the C1000 Gen 2, yet telemetry stays unavailable
-(`AVAILABLE: False`) — see [SolixBLE #22](https://github.com/flip-dots/SolixBLE/issues/22).
-Skipping Anker in the main loop avoids a ~2 minute timeout on every poll cycle.
+The C1000 Gen 2 is **not** supported by [SolixBLE](https://github.com/flip-dots/SolixBLE):
+it connects and negotiates but never sends telemetry (`AVAILABLE: False`, see
+[SolixBLE #22](https://github.com/flip-dots/SolixBLE/issues/22)). The Gen 2
+firmware requires a live ECDH key exchange plus a one-time physical button press,
+which the static SolixBLE handshake cannot do.
 
-To experiment with the collector in isolation:
+We replaced SolixBLE for the Gen 2 with our own port of the working community C++
+protocol:
+
+- `van_monitor/anker_g2_protocol.py` — pure-Python protocol/crypto (no Bluetooth).
+- `van_monitor/collectors/anker_g2.py` — the bleak driver that runs it.
+
+**First-time pairing requires pressing the button on the station.** After that,
+a client id is saved (`config.ANKER_CLIENT_ID_FILE`) and reused, so reconnects
+are automatic.
+
+Validate it before relying on it:
 
 ```bash
-# Find Anker devices:
+# 0. Sanity-check the protocol/crypto with no hardware (works anywhere):
+.venv/bin/python3 scripts/test_anker_protocol.py
+
+# 1. Find the Anker's MAC address:
 .venv/bin/python3 scripts/test_anker.py --discover -v
 
-# Attempt telemetry (terminal output only for now):
+# 2. First-time pairing — watch for "PRESS THE BUTTON" and press the physical
+#    button on the Anker within ~180s. You only do this once.
+#    (-v prints each packet's hex; add --debug-ble for bleak internals.)
 .venv/bin/python3 scripts/test_anker.py -v
+
+# 3. Normal read (no button press needed once paired):
+.venv/bin/python3 scripts/test_anker.py -v
+
+# Re-pair from scratch (e.g. after a factory reset):
+.venv/bin/python3 scripts/test_anker.py --reset-pairing -v
 ```
 
-Set `ANKER_ADDRESS` in `config.py`. Requires Python 3.11+ for SolixBLE.
+Set `ANKER_ADDRESS` in `config.py`. The driver needs the `cryptography` package
+(already in `requirements-pi.txt`); SolixBLE is no longer required.
+
+**`run_monitor.py` still does not poll Anker.** Once you confirm telemetry is
+reliable, you can wire `read_anker()` into `van_monitor/collectors/__init__.py`
+and add an Anker panel to the display layout.
+
+#### Assumptions & key decisions (Anker Gen 2)
+
+- **Ported, not vendored.** The protocol is a hand port of the working C++
+  (`SolixProtocol.cpp` / `BleController.cpp`) into `van_monitor/anker_g2_protocol.py`,
+  using the `cryptography` package for AES-GCM and P-256 ECDH. The C++ targeted
+  an ESP32 (NimBLE + mbedTLS); none of that is reusable on Linux, so the logic
+  was rewritten in Python. The crypto constants (negotiation key/nonce/AAD) are
+  firmware values copied verbatim.
+- **One-time button press.** The Gen 2 authorizes a *client UUID*. The first
+  connection triggers a "press the button" step; we then persist the UUID
+  (`config.ANKER_CLIENT_ID_FILE`) and reuse it, so later connects are automatic.
+  This mirrors how the Anker app pairs once. Delete that file (or use
+  `--reset-pairing`) to start over.
+- **Timestamps use real Unix time.** The C++ used a fake epoch + uptime; the
+  station only needs a consistent, current-ish value, so we use `time.time()`.
+- **Metric mapping:** `SOC = battery_percent` (param A5), `watts in = AC input +
+  solar input` (A6/A8), `watts out = total power out` (A6). Same convention as
+  the previous collector.
+- **Disconnect after read**, like the Li-Time/Anker pattern already used here —
+  the Pi Zero W radio is happier with one short connection per poll.
+- **Validated offline** with `scripts/test_anker_protocol.py` (framing, TLV,
+  ECDH agreement, AES-GCM, telemetry parsing). On-station behavior still needs
+  your real-hardware check.
 
 ### 5. Run everything
 
@@ -207,6 +257,8 @@ Edit `config.py`:
 | `VICTRON_ADDRESS` | Victron MPPT MAC |
 | `VICTRON_KEY` | Victron Instant Readout advertisement key |
 | `ANKER_ADDRESS` | Anker MAC (for `test_anker.py` only) |
+| `ANKER_CLIENT_ID_FILE` | Saved Anker pairing id (delete to re-pair with button press) |
+| `ANKER_BUTTON_WAIT_SECONDS` | How long to wait for the one-time button press (default 180s) |
 | `BLE_TIMEOUT_SECONDS` | Active scan time before connect (default 25s) |
 | `BLE_COOLDOWN_SECONDS` | Pause between BLE devices (default 2s) |
 | `ANKER_TELEMETRY_TIMEOUT_SECONDS` | Wait for first Anker packet after negotiation (default 120s) |
@@ -217,7 +269,8 @@ Edit `config.py`:
 - **Display:** Waveshare 7.5" black/white V2 e-paper HAT over SPI
 - SPI must be enabled: `sudo raspi-config` → Interface Options → SPI
 - Python runs in a project venv (`.venv/`) to avoid Raspberry Pi OS pip restrictions
-- **Anker test script** (`test_anker.py`) requires Python 3.11+ for SolixBLE
+- **Anker C1000 Gen 2** uses a custom driver (`anker_g2_protocol.py`); first
+  connection needs a one-time physical button press on the station to pair
 - **Bluetooth** must be enabled: `sudo raspi-config` → Interface Options → Bluetooth, or run `sudo systemctl start bluetooth && sudo bluetoothctl power on`
 
 ## USB SSH (Pi Zero W ↔ Mac)
@@ -259,7 +312,7 @@ PI_HOST=jamesli@192.168.7.2 ./scripts/deploy.sh
 | ------------------- | -------------------------------- |
 | Li Time house battery | SOC %, net power W, voltage V  |
 | Victron MPPT 100/30 | Solar output W, daily yield Wh   |
-| Anker Solix C1000 Gen 2 | Collector present; not polled (SolixBLE telemetry gap) |
+| Anker Solix C1000 Gen 2 | SOC %, watts in, watts out (custom Gen 2 driver; one-time button-press pairing) |
 
 ## References
 

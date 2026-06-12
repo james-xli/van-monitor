@@ -27,9 +27,10 @@ def poll_all() -> VanMetrics:
     one connection at a time more reliably than overlapping operations.
     Victron is passive (advertisements only) and runs between connect cycles.
 
-    Anker is intentionally omitted: SolixBLE connects to the C1000 Gen 2 but
-    does not yet deliver telemetry (see README). Use scripts/test_anker.py to
-    experiment with the collector in isolation.
+    Anker is intentionally omitted from the main loop for now. The Gen 2 driver
+    (van_monitor/collectors/anker_g2.py) works, but it needs a one-time button
+    press to pair and the current v4 display layout has no Anker panel. Validate
+    with scripts/test_anker.py first, then add it here once it's on the display.
     """
     metrics = VanMetrics()
 

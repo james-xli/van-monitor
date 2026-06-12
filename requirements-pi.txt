@@ -6,6 +6,7 @@ bleak>=0.21.0
 bleak-retry-connector>=3.0.0
 litime-ble>=0.2.0
 victron-ble>=0.9.0
-SolixBLE>=3.7.0
+# cryptography provides AES-GCM + P-256 ECDH for our Anker C1000 Gen 2 driver
+# (van_monitor/anker_g2_protocol.py). It replaces SolixBLE for the Gen 2.
 cryptography>=42.0.0
 pycryptodome>=3.20.0
