@@ -27,7 +27,7 @@ if str(ROOT) not in sys.path:
 import config
 from van_monitor import layout
 from van_monitor.history import HistoryPoint
-from van_monitor.metrics import LitimeMetrics, VanMetrics, VictronMetrics
+from van_monitor.metrics import AnkerMetrics, LitimeMetrics, VanMetrics, VictronMetrics
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -39,10 +39,11 @@ SCENARIO_END_SOC = {"low": 86, "high": 96}
 
 
 def sample_metrics(end_soc: int = 86) -> VanMetrics:
-    """Example readings matching the Figma mockup (node 21:30)."""
+    """Example readings matching Figma Main screen v8 w/ Anker (node 42:116)."""
     return VanMetrics(
         litime=LitimeMetrics(soc_percent=end_soc, power_w=40, voltage_v=12.4, connected=True),
         victron=VictronMetrics(solar_power_w=202, yield_today_wh=1000, connected=True),
+        anker=AnkerMetrics(soc_percent=93, power_in_w=40, power_out_w=110, connected=True),
         updated_at=NOW,
     )
 
@@ -74,7 +75,8 @@ def sample_history(now: float, scenario: str = "low") -> list[HistoryPoint]:
         soc = max(0.0, min(100.0, soc))
         # Daytime hump peaking mid-afternoon; right edge (~202 W) matches the metric.
         solar = max(0.0, 215.6 * math.sin(frac * math.pi * 0.55 + 0.2))
-        points.append(HistoryPoint(t, soc, solar))
+        anker_soc = max(0.0, min(100.0, soc + 7))
+        points.append(HistoryPoint(t, soc, solar, anker_soc))
     return points
 
 
@@ -109,7 +111,7 @@ def _render_png(path: str, metrics: VanMetrics, history: list[HistoryPoint], now
             self._canvas = Image.new("1", (self.width, self.height), layout.WHITE)
             self._draw = ImageDraw.Draw(self._canvas)
             self._font_label = load_bold_font(layout.FONT_LABEL)
-            self._font_body = load_bold_font(layout.FONT_BODY)
+            self._font_stats = load_bold_font(layout.FONT_STATS)
             self._font_hero = load_bold_font(layout.FONT_HERO)
             self._font_solar_hero = load_bold_font(layout.FONT_SOLAR_HERO)
             self._font_solar_body = load_bold_font(layout.FONT_SOLAR_BODY)

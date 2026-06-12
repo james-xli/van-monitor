@@ -1,11 +1,10 @@
 """
-Render P0 van metrics on the e-paper display.
+Render van metrics on the e-paper display.
 
-Layout matches Figma "Main screen v5 w/o Anker" (node 38:35), strict B/W, no chart fills.
+Layout matches Figma "Main screen v8 w/ Anker" (node 42:116), strict B/W.
 
-The house battery panel's black background is a 12h SOC area chart: the latest SOC
-sits at the right edge, fill height at each column equals SOC% at that time, and thin
-vertical lines mark each 1h increment counting back from now.
+The house and Anker panels show SOC area charts in their top regions; the solar
+panel shows a stroke-only power line. Stats sit on white below each divider.
 """
 
 from __future__ import annotations
@@ -23,6 +22,7 @@ from van_monitor.fonts import load_bold_font, load_caption_font
 from van_monitor.metrics import (
     VanMetrics,
     fmt,
+    fmt_anker_power_lines,
     fmt_date_lines,
     fmt_signed_watts,
     fmt_yield_today,
@@ -33,15 +33,16 @@ class _HistoryPoint(Protocol):
     t: float
     soc: float | None
     solar: float | None
+    anker_soc: float | None
 
 
 class MetricsDashboard(EpaperDisplay):
-    """Draw P0 metrics in fixed zones (Figma Main screen v7 w/o Anker)."""
+    """Draw metrics in fixed zones (Figma Main screen v8 w/ Anker)."""
 
     def __init__(self):
         super().__init__()
         self._font_label = load_bold_font(layout.FONT_LABEL)
-        self._font_body = load_bold_font(layout.FONT_BODY)
+        self._font_stats = load_bold_font(layout.FONT_STATS)
         self._font_hero = load_bold_font(layout.FONT_HERO)
         self._font_solar_hero = load_bold_font(layout.FONT_SOLAR_HERO)
         self._font_solar_body = load_bold_font(layout.FONT_SOLAR_BODY)
@@ -63,9 +64,11 @@ class MetricsDashboard(EpaperDisplay):
         self._draw_zone(layout.SOLAR, layout.STYLE_SOLAR)
         self._draw_solar_chart(history, now)
         self._draw_house_battery_background(history, now)
+        self._draw_anker_background(history, now)
         self._draw_flow_arrows()
         self._draw_solar(metrics)
         self._draw_house_battery(metrics)
+        self._draw_anker(metrics)
         self._draw_date(metrics)
 
     def _zone_bbox(self, zone: layout.Zone) -> tuple[int, int, int, int]:
@@ -115,19 +118,10 @@ class MetricsDashboard(EpaperDisplay):
         width: int,
         value_of,
     ) -> list[float | None]:
-        """
-        Map each pixel column to a value via sample-and-hold (last known value).
-
-        Columns earlier than the first data point stay None (not drawn), which
-        keeps the chart time-accurate after a fresh boot.
-        """
+        """Map each pixel column to a value via sample-and-hold."""
         col_values: list[float | None] = [None] * width
         points = sorted(
-            (
-                (p.t, value_of(p))
-                for p in history
-                if value_of(p) is not None
-            ),
+            ((p.t, value_of(p)) for p in history if value_of(p) is not None),
             key=lambda item: item[0],
         )
         if not points or width <= 0:
@@ -179,22 +173,19 @@ class MetricsDashboard(EpaperDisplay):
         if run_start is not None:
             self._draw.line((run_start, y, chart.x1 - 1, y), fill=layout.BLACK)
 
-    # --- house battery SOC history chart ------------------------------------
-
-    def _draw_house_battery_background(
+    def _draw_soc_area_chart(
         self,
+        panel: layout.Zone,
+        chart: layout.Zone,
         history: Sequence[_HistoryPoint],
         now: float,
+        window: float,
+        value_of,
     ) -> None:
-        panel = layout.HOUSE_BATTERY
-        chart = layout.HOUSE_CHART
-        window = config.HOUSE_HISTORY_HOURS * 3600
-
+        """Black SOC fill from the curve down to the divider; white above."""
         self._draw.rectangle((panel.x, panel.y, panel.x1 - 1, panel.y1 - 1), fill=layout.WHITE)
 
-        # SOC area chart in the top region: black fill from the curve down to the
-        # divider (the chart's baseline); white above.
-        col_soc = self._column_series(history, now, window, chart.width, lambda p: p.soc)
+        col_soc = self._column_series(history, now, window, chart.width, value_of)
         for col, soc in enumerate(col_soc):
             if soc is None:
                 continue
@@ -208,7 +199,6 @@ class MetricsDashboard(EpaperDisplay):
             for soc in col_soc
         ]
 
-        # Solid black hour gridlines, only in the white area above the fill.
         for col in self._hour_gridline_columns(window, chart.width):
             fill_top = col_fill_top[col]
             if fill_top - 1 >= chart.y:
@@ -217,25 +207,53 @@ class MetricsDashboard(EpaperDisplay):
                     fill=layout.BLACK,
                 )
 
-        # Dotted black SOC gridlines every 10%, clipped above the fill.
         for pct in range(layout.SOC_GRID_STEP, 100, layout.SOC_GRID_STEP):
             y = self._value_to_y(chart, float(pct), 100.0)
             self._draw_dotted_horizontal_above_fill(y, chart, col_fill_top)
 
-        # Separated stats strip below the divider: always solid black for white text.
-        self._draw.rectangle(
-            (panel.x, layout.HOUSE_DIVIDER_Y, panel.x1 - 1, panel.y1 - 1), fill=layout.BLACK
-        )
-        # White divider so it reads against the black stats strip.
+        divider_y = chart.y + chart.height
         self._draw.line(
-            (panel.x, layout.HOUSE_DIVIDER_Y, panel.x1-1, layout.HOUSE_DIVIDER_Y),
-            fill=layout.WHITE,
+            (panel.x, divider_y, panel.x1 - 1, divider_y),
+            fill=layout.BLACK,
             width=layout.SOLAR_DIVIDER_WIDTH,
         )
 
-        # Clip the fill out of the rounded corners, then stroke the rounded frame.
         self._clip_corners(panel)
         self._draw_panel_border(panel, layout.STYLE_BATTERY)
+
+    # --- house battery SOC history chart ------------------------------------
+
+    def _draw_house_battery_background(
+        self,
+        history: Sequence[_HistoryPoint],
+        now: float,
+    ) -> None:
+        window = config.HOUSE_HISTORY_HOURS * 3600
+        self._draw_soc_area_chart(
+            layout.HOUSE_BATTERY,
+            layout.HOUSE_CHART,
+            history,
+            now,
+            window,
+            lambda p: p.soc,
+        )
+
+    # --- anker SOC history chart --------------------------------------------
+
+    def _draw_anker_background(
+        self,
+        history: Sequence[_HistoryPoint],
+        now: float,
+    ) -> None:
+        window = config.HOUSE_HISTORY_HOURS * 3600
+        self._draw_soc_area_chart(
+            layout.ANKER,
+            layout.ANKER_CHART,
+            history,
+            now,
+            window,
+            lambda p: p.anker_soc,
+        )
 
     # --- solar power history line chart -------------------------------------
 
@@ -244,12 +262,10 @@ class MetricsDashboard(EpaperDisplay):
         history: Sequence[_HistoryPoint],
         now: float,
     ) -> None:
-        # The chart occupies the top region only; text sits below the divider.
         chart = layout.SOLAR_CHART
         panel = layout.SOLAR
         window = config.SOLAR_HISTORY_HOURS * 3600
 
-        # Stroke-only line of solar power (0..SOLAR_MAX_W), latest at the right edge.
         col_w = self._column_series(history, now, window, chart.width, lambda p: p.solar)
         vmax = float(config.SOLAR_MAX_W)
 
@@ -258,21 +274,15 @@ class MetricsDashboard(EpaperDisplay):
             for value in col_w
         ]
 
-        # Hour gridlines, black, only in the area above the line (mirrors the battery
-        # panel). They run from the panel's top edge down to the line, not just from
-        # the chart's inset top, so they reach the frame.
         for col in self._hour_gridline_columns(window, chart.width):
             line_y = col_line_y[col]
             if line_y - 1 >= panel.y:
                 self._draw.line((chart.x + col, panel.y, chart.x + col, line_y - 1), fill=layout.BLACK)
 
-        # Dotted horizontal power gridlines every 50 W, clipped above the line.
         for watts in range(layout.SOLAR_GRID_STEP, int(vmax), layout.SOLAR_GRID_STEP):
             y = self._value_to_y(chart, float(watts), vmax)
             self._draw_dotted_horizontal_above_fill(y, chart, col_line_y)
 
-        # Clamp the top so the peak stays inside the frame; let 0 W sit exactly on
-        # the divider (chart.y1 == SOLAR_DIVIDER_Y), where the divider covers it.
         half = layout.SOLAR_LINE_WIDTH // 2
         y_min = chart.y + half
         y_max = chart.y1
@@ -287,14 +297,12 @@ class MetricsDashboard(EpaperDisplay):
             run.append((chart.x + col, y))
         self._flush_line(run)
 
-        # Divider line between the chart and the text below it (node 38:57).
         self._draw.line(
             (panel.x, layout.SOLAR_DIVIDER_Y, panel.x1 - 1, layout.SOLAR_DIVIDER_Y),
             fill=layout.BLACK,
             width=layout.SOLAR_DIVIDER_WIDTH,
         )
 
-        # Clip the line/gridlines out of the rounded corners, then stroke the frame.
         self._clip_corners(panel)
         self._draw_panel_border(panel, layout.STYLE_SOLAR)
 
@@ -308,6 +316,7 @@ class MetricsDashboard(EpaperDisplay):
 
     def _draw_flow_arrows(self) -> None:
         self._draw_arrow(*layout.ARROW_SOLAR_TO_HOUSE, fill=layout.BLACK)
+        self._draw_arrow(*layout.ARROW_HOUSE_TO_ANKER, fill=layout.BLACK)
 
     def _draw_arrow(
         self,
@@ -364,15 +373,12 @@ class MetricsDashboard(EpaperDisplay):
         zone: layout.Zone,
         y: int,
         style: layout.PanelStyle,
-        *,
-        stroke_width: int | None = None,
     ) -> None:
-        """Right-aligned caption (Inter Medium Italic 14px)."""
         font = self._font_caption
         bbox = self._draw.textbbox((0, 0), text, font=font)
         width = bbox[2] - bbox[0]
         x = zone.x1 - width - layout.CAPTION_RIGHT_MARGIN
-        self._text(text, (x, y), font, style, stroke_width=stroke_width)
+        self._text(text, (x, y), font, style)
 
     def _text_right(
         self,
@@ -381,18 +387,14 @@ class MetricsDashboard(EpaperDisplay):
         y: int,
         font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
         style: layout.PanelStyle,
-        *,
-        stroke_width: int | None = None,
     ) -> None:
-        """Draw text right-aligned to right_x."""
         bbox = self._draw.textbbox((0, 0), text, font=font)
         width = bbox[2] - bbox[0]
-        self._text(text, (right_x - width, y), font, style, stroke_width=stroke_width)
+        self._text(text, (right_x - width, y), font, style)
 
     # --- panels -------------------------------------------------------------
 
     def _draw_solar(self, metrics: VanMetrics) -> None:
-        # v5: text sits below the chart on a clean white area, so no halo is needed.
         style = layout.STYLE_SOLAR
         self._text(layout.LABEL_SOLAR, layout.SOLAR_LABEL, self._font_label, style)
         self._text(
@@ -422,40 +424,33 @@ class MetricsDashboard(EpaperDisplay):
             )
 
     def _draw_house_battery(self, metrics: VanMetrics) -> None:
-        # Stats live in the solid-black strip below the divider; white text + halo.
         style = layout.STYLE_BATTERY
-        sw = layout.HOUSE_TEXT_STROKE_WIDTH
-        self._text(layout.LABEL_HOUSE, layout.HOUSE_LABEL, self._font_label, style, stroke_width=sw)
+        self._text(layout.LABEL_HOUSE, layout.HOUSE_LABEL, self._font_label, style)
         self._text(
             fmt(metrics.litime.soc_percent, suffix="%"),
             layout.HOUSE_SOC,
             self._font_hero,
             style,
-            stroke_width=sw,
         )
-        # Power and voltage are right-aligned (v7).
         self._text_right(
             fmt_signed_watts(metrics.litime.power_w),
             layout.HOUSE_STATS_RIGHT,
             layout.HOUSE_POWER_Y,
-            self._font_body,
+            self._font_stats,
             style,
-            stroke_width=sw,
         )
         self._text_right(
             fmt(metrics.litime.voltage_v, decimals=1, suffix=" V"),
             layout.HOUSE_STATS_RIGHT,
             layout.HOUSE_VOLTAGE_Y,
-            self._font_body,
+            self._font_stats,
             style,
-            stroke_width=sw,
         )
         self._draw_caption_right(
             f"{config.HOUSE_BATTERY_CAPACITY_KWH} kWh capacity",
             layout.HOUSE_BATTERY,
             layout.HOUSE_CAPACITY_CAPTION_Y,
             style,
-            stroke_width=sw,
         )
         if metrics.litime.error:
             self._text(
@@ -463,7 +458,47 @@ class MetricsDashboard(EpaperDisplay):
                 (layout.HOUSE_BATTERY.x + 16, layout.HOUSE_DIVIDER_Y + 4),
                 self._font_label,
                 style,
-                stroke_width=sw,
+            )
+
+    def _draw_anker(self, metrics: VanMetrics) -> None:
+        style = layout.STYLE_BATTERY
+        self._text(layout.LABEL_ANKER, layout.ANKER_LABEL, self._font_label, style)
+        self._text(
+            fmt(metrics.anker.soc_percent, suffix="%"),
+            layout.ANKER_SOC,
+            self._font_hero,
+            style,
+        )
+        power_in, power_out = fmt_anker_power_lines(
+            metrics.anker.power_in_w,
+            metrics.anker.power_out_w,
+        )
+        self._text_right(
+            power_in,
+            layout.ANKER_STATS_RIGHT,
+            layout.ANKER_POWER_IN_Y,
+            self._font_stats,
+            style,
+        )
+        self._text_right(
+            power_out,
+            layout.ANKER_STATS_RIGHT,
+            layout.ANKER_POWER_OUT_Y,
+            self._font_stats,
+            style,
+        )
+        self._draw_caption_right(
+            f"{config.ANKER_CAPACITY_KWH} kWh capacity",
+            layout.ANKER,
+            layout.ANKER_CAPACITY_CAPTION_Y,
+            style,
+        )
+        if metrics.anker.error:
+            self._text(
+                metrics.anker.error[:28],
+                (layout.ANKER.x + 16, layout.ANKER_DIVIDER_Y + 4),
+                self._font_label,
+                style,
             )
 
     def _draw_date(self, metrics: VanMetrics) -> None:
@@ -492,5 +527,5 @@ class MetricsDashboard(EpaperDisplay):
         self.reset_canvas()
         style = layout.STYLE_SOLAR
         self._text("van-monitor", (16, 16), self._font_label, style)
-        self._text(message, (16, 40), self._font_body, style)
+        self._text(message, (16, 40), self._font_stats, style)
         self.refresh(partial=False)

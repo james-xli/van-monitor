@@ -141,9 +141,9 @@ Validate it before relying on it:
 Set `ANKER_ADDRESS` in `config.py`. The driver needs the `cryptography` package
 (already in `requirements-pi.txt`); SolixBLE is no longer required.
 
-**`run_monitor.py` still does not poll Anker.** Once you confirm telemetry is
-reliable, you can wire `read_anker()` into `van_monitor/collectors/__init__.py`
-and add an Anker panel to the display layout.
+**`run_monitor.py` polls Anker** on a slower interval (`ANKER_POLL_INTERVAL_SECONDS`,
+default 60s) because each read reconnects and re-handshakes over BLE. The display
+uses the Figma **Main screen v8 w/ Anker** layout.
 
 #### Assumptions & key decisions (Anker Gen 2)
 
@@ -256,7 +256,9 @@ Edit `config.py`:
 | `LITIME_ADDRESS` | Li-Time battery MAC (empty = auto-discover) |
 | `VICTRON_ADDRESS` | Victron MPPT MAC |
 | `VICTRON_KEY` | Victron Instant Readout advertisement key |
-| `ANKER_ADDRESS` | Anker MAC (for `test_anker.py` only) |
+| `ANKER_ADDRESS` | Anker MAC |
+| `ANKER_CAPACITY_KWH` | Caption under the Anker panel (default 1) |
+| `ANKER_POLL_INTERVAL_SECONDS` | How often to poll Anker in `run_monitor.py` (default 60s) |
 | `ANKER_CLIENT_ID_FILE` | Saved Anker pairing id (delete to re-pair with button press) |
 | `ANKER_BUTTON_WAIT_SECONDS` | How long to wait for the one-time button press (default 180s) |
 | `BLE_TIMEOUT_SECONDS` | Active scan time before connect (default 25s) |

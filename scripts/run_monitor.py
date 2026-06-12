@@ -6,9 +6,8 @@ Test each device individually first:
     scripts/test_litime.py
     scripts/test_victron.py
 
-Anker is not polled here yet. The Gen 2 driver works but needs a one-time
-button-press pairing and is not on the display layout. Validate it with
-scripts/test_anker.py, then wire it into collectors/__init__.py.
+Anker is polled on a slower interval (config.ANKER_POLL_INTERVAL_SECONDS)
+because each read reconnects and re-handshakes over BLE.
 """
 
 from __future__ import annotations
@@ -111,6 +110,7 @@ def main() -> int:
         history.record(
             metrics.litime.soc_percent,
             metrics.victron.solar_power_w,
+            anker_soc=metrics.anker.soc_percent,
             now=now,
         )
 

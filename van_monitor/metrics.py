@@ -77,6 +77,29 @@ def fmt_anker_net(power_in_w: float | None, power_out_w: float | None) -> str:
     return fmt_signed_watts(power_in_w - power_out_w)
 
 
+def fmt_anker_power_lines(
+    power_in_w: float | None,
+    power_out_w: float | None,
+) -> tuple[str, str]:
+    """Two-line Anker in/out labels like Figma v8: '+40 W in' / '-110 W out'."""
+    if power_in_w is None:
+        in_line = config.UNAVAILABLE_LABEL
+    else:
+        watts = int(round(power_in_w))
+        sign = "+" if watts > 0 else ""
+        in_line = f"{sign}{watts} W in"
+
+    if power_out_w is None:
+        out_line = config.UNAVAILABLE_LABEL
+    else:
+        watts = int(round(power_out_w))
+        if watts > 0:
+            out_line = f"-{watts} W out"
+        else:
+            out_line = f"{watts} W out"
+    return in_line, out_line
+
+
 def fmt_date_lines(when: datetime | None) -> tuple[str, str]:
     """Two-line date like Figma node 40:97: ('Thursday', 'June 11')."""
     if when is None:

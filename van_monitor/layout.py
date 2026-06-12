@@ -1,10 +1,11 @@
 """
 Figma layout constants for the main screen (800×480).
 
-Source: Van Systems Monitor — frame "Main screen v5 w/o Anker" (node 38:35).
+Source: Van Systems Monitor — frame "Main screen v8 w/ Anker" (node 42:116).
 Coordinates are absolute screen positions (panel origin + inner offset).
 
-P1 chart fills are omitted; gray/black chart areas in Figma are placeholders.
+Chart line widths, grid dash settings, and corner radii follow the values
+established in v5–v7 (not re-derived from Figma placeholders).
 """
 
 from __future__ import annotations
@@ -14,16 +15,14 @@ from dataclasses import dataclass
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 480
 
-# Inter from Figma (Bold labels/values, Medium Italic 14 captions).
-# House battery uses the large 54/24 pair; the v5 Solar panel uses a smaller 40/20.
+# Inter from Figma v8 (Bold labels/values, Medium Italic 14 captions).
 FONT_LABEL = 14
-FONT_BODY = 24
-FONT_HERO = 54
-FONT_SOLAR_HERO = 40
-FONT_SOLAR_BODY = 20
+FONT_STATS = 18
+FONT_SOLAR_HERO = 32
+FONT_SOLAR_BODY = 18
+FONT_HERO = 40
 FONT_CAPTION = 14
-# v7 shows a large two-line date (node 40:97) instead of a small timestamp.
-FONT_DATE = 36
+FONT_DATE = 40
 
 CAPTION_RIGHT_MARGIN = 14
 
@@ -33,6 +32,7 @@ BLACK = 0
 
 LABEL_SOLAR = "SOLAR"
 LABEL_HOUSE = "HOUSE  BATTERY"
+LABEL_ANKER = "ANKER SOLIX"
 
 
 @dataclass(frozen=True)
@@ -64,7 +64,7 @@ class PanelStyle:
     border_width: int = 2
 
 
-# Solar panel (38:36): white fill, 3px black border (matches the house battery)
+# Solar panel (42:117): white fill, black border
 STYLE_SOLAR = PanelStyle(
     fill=WHITE,
     border=BLACK,
@@ -73,29 +73,24 @@ STYLE_SOLAR = PanelStyle(
     border_width=2,
 )
 
-# House battery panel (38:44): black SOC fill from bottom, 3px border marks 100% frame
-HOUSE_BATTERY_BORDER_WIDTH = 2
+# House + Anker panels (42:125, 43:137): white fill, black border, black text
 STYLE_BATTERY = PanelStyle(
-    fill=BLACK,
+    fill=WHITE,
     border=BLACK,
-    text_fill=WHITE,
-    text_stroke=BLACK,
-    border_width=HOUSE_BATTERY_BORDER_WIDTH,
+    text_fill=BLACK,
+    text_stroke=WHITE,
+    border_width=2,
 )
 
 TEXT_STROKE_WIDTH = 1
 
-# The house battery text sits over its chart background, so it uses a thicker halo.
-# (v5 moved the solar text below its chart, so solar text needs no halo.)
-HOUSE_TEXT_STROKE_WIDTH = 5
-
 # Solar panel y-axis is 0..config.SOLAR_MAX_W; the history line is stroke-only (no fill).
 SOLAR_LINE_WIDTH = 2
 
-# Thickness (px) of the divider between the solar chart and its text (node 38:57).
+# Thickness (px) of the divider between chart and stats text.
 SOLAR_DIVIDER_WIDTH = 2
 
-# Corner radius (px) for the solar and battery panel frames.
+# Corner radius (px) for panel frames.
 PANEL_CORNER_RADIUS = 10
 
 # Dotted horizontal grid: dash/gap in pixels (shared by battery + solar charts).
@@ -114,38 +109,50 @@ def _abs(frame: Zone, left: int, top: int) -> tuple[int, int]:
     return (frame.x + left, frame.y + top)
 
 
-# Panels — node 40:80 Solar (half width), node 40:89 House Battery
-SOLAR = Zone(x=20, y=150, width=240, height=200)
-HOUSE_BATTERY = Zone(x=300, y=86, width=480, height=340)
+# Panels — Solar (42:117), House (42:125), Anker (43:137)
+SOLAR = Zone(x=20, y=52, width=240, height=185)
+HOUSE_BATTERY = Zone(x=300, y=20, width=480, height=250)
+ANKER = Zone(x=300, y=300, width=480, height=160)
 
-# Solar chart area (node 40:81): top region above the divider (node 40:88).
-SOLAR_CHART = Zone(x=SOLAR.x, y=SOLAR.y + 8, width=SOLAR.width, height=97)
-SOLAR_DIVIDER_Y = SOLAR.y + 105
+# Solar chart (42:118): top 100px, divider at y=100 (42:124)
+SOLAR_CHART = Zone(x=SOLAR.x, y=SOLAR.y, width=SOLAR.width, height=100)
+SOLAR_DIVIDER_Y = SOLAR.y + 100
 
-# Solar text below the divider (nodes 40:85–40:87, caption 40:82 right-aligned)
-SOLAR_LABEL = _abs(SOLAR, 12, 113)
-SOLAR_VALUE = _abs(SOLAR, 10, 127)
-SOLAR_YIELD_TODAY = _abs(SOLAR, 10, 171)
-SOLAR_MAX_CAPTION_Y = _abs(SOLAR, 0, 113)[1]
+# Solar text below divider (42:119–42:123)
+SOLAR_LABEL = _abs(SOLAR, 12, 106)
+SOLAR_VALUE = _abs(SOLAR, 10, 121)
+SOLAR_YIELD_TODAY = _abs(SOLAR, 10, 157)
+SOLAR_MAX_CAPTION_Y = _abs(SOLAR, 0, 106)[1]
 
-# House battery chart area (node 40:90) above its stats divider (node 40:110).
-# The stats strip below the divider is filled solid black with white text.
-HOUSE_CHART = Zone(x=HOUSE_BATTERY.x, y=HOUSE_BATTERY.y, width=HOUSE_BATTERY.width, height=245)
-HOUSE_DIVIDER_Y = HOUSE_BATTERY.y + 245
+# House chart (42:126): top 180px, divider implied at y=180
+HOUSE_CHART = Zone(x=HOUSE_BATTERY.x, y=HOUSE_BATTERY.y, width=HOUSE_BATTERY.width, height=180)
+HOUSE_DIVIDER_Y = HOUSE_BATTERY.y + 180
 
-# House battery stats (nodes 40:93–40:95, caption 40:91). The SOC % and label are
-# left-aligned; power/voltage and the capacity caption are right-aligned.
-HOUSE_LABEL = _abs(HOUSE_BATTERY, 16, 255)
-HOUSE_SOC = _abs(HOUSE_BATTERY, 15, 272)
+# House stats (42:127–42:132) on white below the chart
+HOUSE_LABEL = _abs(HOUSE_BATTERY, 16, 186)
+HOUSE_SOC = _abs(HOUSE_BATTERY, 15, 200)
 HOUSE_STATS_RIGHT = HOUSE_BATTERY.x1 - 15
-HOUSE_POWER_Y = HOUSE_BATTERY.y + 279
-HOUSE_VOLTAGE_Y = HOUSE_BATTERY.y + 303
-HOUSE_CAPACITY_CAPTION_Y = _abs(HOUSE_BATTERY, 0, 255)[1]
+HOUSE_POWER_Y = HOUSE_BATTERY.y + 205
+HOUSE_VOLTAGE_Y = HOUSE_BATTERY.y + 223
+HOUSE_CAPACITY_CAPTION_Y = _abs(HOUSE_BATTERY, 0, 186)[1]
 
-# Large two-line date, top-left (node 40:97). Time is no longer shown.
-DATE_ORIGIN = (20, 20)
-DATE_LINE_HEIGHT = 36
+# Anker chart (43:138): top 90px
+ANKER_CHART = Zone(x=ANKER.x, y=ANKER.y, width=ANKER.width, height=90)
+ANKER_DIVIDER_Y = ANKER.y + 90
 
-# Flow arrow solar → house (node 40:96)
-ARROW_SOLAR_TO_HOUSE = ((271, 256), (289, 256))
+# Anker stats (43:145–43:150)
+ANKER_LABEL = _abs(ANKER, 16, 95)
+ANKER_SOC = _abs(ANKER, 15, 109)
+ANKER_STATS_RIGHT = ANKER.x1 - 15
+ANKER_POWER_IN_Y = ANKER.y + 114
+ANKER_POWER_OUT_Y = ANKER.y + 132
+ANKER_CAPACITY_CAPTION_Y = _abs(ANKER, 0, 95)[1]
+
+# Two-line date, bottom-left (42:135)
+DATE_ORIGIN = (20, 360)
+DATE_LINE_HEIGHT = 40
+
+# Flow arrows (42:134 solar→house, 43:152 house→anker)
+ARROW_SOLAR_TO_HOUSE = ((271, 152), (289, 152))
+ARROW_HOUSE_TO_ANKER = ((540, 276), (540, 294))
 ARROW_HEAD_SIZE = 10

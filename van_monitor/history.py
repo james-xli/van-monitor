@@ -25,8 +25,9 @@ class HistoryPoint:
     """A single logged reading."""
 
     t: float  # epoch seconds
-    soc: float | None  # battery state of charge, %
+    soc: float | None  # Li-Time house battery SOC, %
     solar: float | None  # solar power, W
+    anker_soc: float | None = None  # Anker SOC, %
 
 
 def _coerce_float(value: object) -> float | None:
@@ -71,6 +72,7 @@ class MetricsHistory:
         soc: float | None,
         solar: float | None,
         *,
+        anker_soc: float | None = None,
         now: float | None = None,
     ) -> bool:
         """
@@ -87,7 +89,7 @@ class MetricsHistory:
         ):
             return False
 
-        point = HistoryPoint(now, soc, solar)
+        point = HistoryPoint(now, soc, solar, anker_soc)
         self._points.append(point)
         self._last_recorded_t = now
         self._append_line(point)
@@ -119,7 +121,12 @@ class MetricsHistory:
                     if t is None or t < cutoff:
                         continue
                     points.append(
-                        HistoryPoint(t, _coerce_float(obj.get("soc")), _coerce_float(obj.get("solar")))
+                        HistoryPoint(
+                            t,
+                            _coerce_float(obj.get("soc")),
+                            _coerce_float(obj.get("solar")),
+                            _coerce_float(obj.get("anker_soc")),
+                        )
                     )
         except OSError as exc:
             logger.warning("History: could not read %s: %s", self.path, exc)
@@ -136,7 +143,14 @@ class MetricsHistory:
             self._points = [p for p in self._points if p.t >= cutoff]
 
     def _serialize(self, point: HistoryPoint) -> str:
-        return json.dumps({"t": round(point.t, 1), "soc": point.soc, "solar": point.solar})
+        payload = {
+            "t": round(point.t, 1),
+            "soc": point.soc,
+            "solar": point.solar,
+        }
+        if point.anker_soc is not None:
+            payload["anker_soc"] = point.anker_soc
+        return json.dumps(payload)
 
     def _append_line(self, point: HistoryPoint) -> None:
         try:
